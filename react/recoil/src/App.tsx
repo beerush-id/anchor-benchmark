@@ -1,4 +1,5 @@
 import { createBrowserRouter, RouterProvider } from 'react-router';
+import { RecoilRoot } from 'recoil';
 import './App.css';
 import Home from './Home';
 import Medium from './Medium';
@@ -20,7 +21,11 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <RecoilRoot>
+      <RouterProvider router={router} />
+    </RecoilRoot>
+  );
 }
 
 export default App;
