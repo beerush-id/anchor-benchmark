@@ -1,0 +1,50 @@
+import { useRecoilState, atom } from 'recoil';
+
+const counterAtom = atom({
+  key: 'counter',
+  default: { count: 0 },
+});
+
+export default function Home() {
+  const [counter, setCounter] = useRecoilState(counterAtom);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full mx-4">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Hello, World!</h1>
+          <p className="text-gray-600 mb-8">Welcome to the Recoil Benchmark</p>
+          
+          <div className="bg-gray-50 rounded-xl p-6 mb-8">
+            <h2 className="text-2xl font-semibold text-gray-700 mb-4">Counter</h2>
+            <div className="text-5xl font-bold text-indigo-600 mb-6">{counter.count}</div>
+            <div className="flex justify-center space-x-4">
+              <button 
+                onClick={() => setCounter(c => ({ count: c.count - 1 }))}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
+              >
+                Decrement
+              </button>
+              <button 
+                onClick={() => setCounter({ count: 0 })}
+                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+              >
+                Reset
+              </button>
+              <button 
+                onClick={() => setCounter(c => ({ count: c.count + 1 }))}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300"
+              >
+                Increment
+              </button>
+            </div>
+          </div>
+          
+          <div className="text-sm text-gray-500">
+            Using Recoil state management
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

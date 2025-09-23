@@ -1,0 +1,26 @@
+{
+  "name": "anchor-benchmark",
+  "type": "module",
+  "version": "0.0.1",
+  "description": "",
+  "scripts": {
+    "build": "bpkg run build",
+    "dev": "bpkg run dev",
+    "format": "bpkg run format",
+    "lint": "bpkg run lint",
+    "test": "bpkg run test"
+  },
+  "devDependencies": {
+    "monopkg": "^0.3.10",
+    "prettier": "^3.4.2"
+  },
+  "engines": {
+    "bun": ">=1.2.21"
+  },
+  "packageManager": "bun@1.2.21",
+  "private": true,
+  "workspaces": [
+    "react/*",
+    "packages/*"
+  ]
+}
