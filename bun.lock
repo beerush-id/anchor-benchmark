@@ -37,6 +37,7 @@
       },
       "devDependencies": {
         "@anchor-benchmark/shared": "workspace:*",
+        "@anchorlib/core": "^1.0.0-beta.4",
         "@anchorlib/react": "^1.0.0-beta.4",
         "@eslint/js": "^9.36.0",
         "@tailwindcss/vite": "^4.1.13",
@@ -67,6 +68,7 @@
       },
       "devDependencies": {
         "@anchor-benchmark/shared": "workspace:*",
+        "@anchorlib/core": "^1.0.0-beta.4",
         "@eslint/js": "^9.36.0",
         "@tailwindcss/vite": "^4.1.13",
         "@types/react": "^19.1.13",
@@ -97,6 +99,7 @@
       },
       "devDependencies": {
         "@anchor-benchmark/shared": "workspace:*",
+        "@anchorlib/core": "^1.0.0-beta.4",
         "@eslint/js": "^9.36.0",
         "@tailwindcss/vite": "^4.1.13",
         "@types/react": "^19.1.13",
@@ -127,6 +130,7 @@
       },
       "devDependencies": {
         "@anchor-benchmark/shared": "workspace:*",
+        "@anchorlib/core": "^1.0.0-beta.4",
         "@eslint/js": "^9.36.0",
         "@tailwindcss/vite": "^4.1.13",
         "@types/react": "^19.1.13",
@@ -156,6 +160,7 @@
       },
       "devDependencies": {
         "@anchor-benchmark/shared": "workspace:*",
+        "@anchorlib/core": "^1.0.0-beta.4",
         "@eslint/js": "^9.36.0",
         "@tailwindcss/vite": "^4.1.13",
         "@types/react": "^19.1.13",
@@ -186,6 +191,7 @@
       },
       "devDependencies": {
         "@anchor-benchmark/shared": "workspace:*",
+        "@anchorlib/core": "^1.0.0-beta.4",
         "@eslint/js": "^9.36.0",
         "@reduxjs/toolkit": "^2.9.0",
         "@tailwindcss/vite": "^4.1.13",
@@ -217,6 +223,7 @@
       },
       "devDependencies": {
         "@anchor-benchmark/shared": "workspace:*",
+        "@anchorlib/core": "^1.0.0-beta.4",
         "@eslint/js": "^9.36.0",
         "@tailwindcss/vite": "^4.1.13",
         "@types/react": "^19.1.13",

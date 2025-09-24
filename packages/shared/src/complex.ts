@@ -1,4 +1,21 @@
-export interface Comment {
+export type Author = {
+  id: string;
+  username: string;
+  avatar: string;
+  reputation: number;
+  badges: string[];
+  location: {
+    city: string;
+    country: string;
+    timezone: string;
+  };
+  social: {
+    twitter: string;
+    github: string;
+  };
+};
+
+export type Comment = {
   id: string;
   authorId: string;
   content: string;
@@ -6,9 +23,10 @@ export interface Comment {
   updatedAt: Date;
   likes: string[]; // user IDs who liked the comment
   replies: Comment[]; // nested replies
-}
+  author: Author;
+};
 
-export interface Post {
+export type Post = {
   id: string;
   authorId: string;
   title: string;
@@ -28,10 +46,11 @@ export interface Post {
     seoTitle?: string;
     seoDescription?: string;
     readingTime: number; // in minutes
+    lastEditor: Author;
   };
-}
+};
 
-export interface Category {
+export type Category = {
   id: string;
   name: string;
   slug: string;
@@ -39,16 +58,16 @@ export interface Category {
   parentId?: string; // for hierarchical categories
   children: Category[]; // nested subcategories
   postCount: number;
-}
+};
 
-export interface Tag {
+export type Tag = {
   id: string;
   name: string;
   slug: string;
   postCount: number;
-}
+};
 
-export interface Notification {
+export type Notification = {
   id: string;
   userId: string;
   type: 'comment' | 'like' | 'follow' | 'mention' | 'system';
@@ -58,20 +77,20 @@ export interface Notification {
   createdAt: Date;
   relatedEntityId?: string; // ID of the entity related to this notification
   relatedEntityType?: 'post' | 'comment' | 'user';
-}
+};
 
-export interface ActivityLog {
+export type ActivityLog = {
   id: string;
   userId: string;
   action: string;
   entityType: string;
   entityId: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   timestamp: Date;
   ipAddress?: string;
-}
+};
 
-export interface AnalyticsData {
+export type AnalyticsData = {
   daily: {
     date: Date;
     visitors: number;
@@ -88,9 +107,9 @@ export interface AnalyticsData {
     views: number;
     engagement: number; // likes + comments
   }[];
-}
+};
 
-export interface ComplexState {
+export type ComplexState = {
   posts: Post[];
   categories: Category[];
   tags: Tag[];
@@ -105,4 +124,4 @@ export interface ComplexState {
     theme: 'light' | 'dark' | 'system';
     language: string;
   };
-}
+};
