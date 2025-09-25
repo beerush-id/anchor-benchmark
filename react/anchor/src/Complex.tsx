@@ -1,15 +1,15 @@
 import { debugRender, useObservedList, useWriter } from '@anchorlib/react';
 import { observable, observe } from '@anchorlib/react/view';
-import { anchor, microloop, shortId } from '@anchorlib/core';
+import { anchor, shortId } from '@anchorlib/core';
 import { Eye, MessageSquare, Heart, Trash2, BarChart2, Folder, Tag, User, Calendar, Hash, Reply } from 'lucide-react';
 import {
-  BENCHMARK_DEBOUNCE_TIME,
   BENCHMARK_SIZE,
   BENCHMARK_TOGGLE_SIZE,
   type Post,
   type Category,
   type Tag as TagType,
   type ComplexState,
+  evaluate,
 } from '@anchor-benchmark/shared';
 import { memo, useRef } from 'react';
 import RAWJson from './dummyContent.json';
@@ -25,17 +25,12 @@ const postsWriter = anchor.writable(complexApp.posts, ['push', 'splice']);
 const categoriesWriter = anchor.writable(complexApp.categories, ['push', 'splice']);
 const tagsWriter = anchor.writable(complexApp.tags, ['push', 'splice']);
 
-const [loop] = microloop(BENCHMARK_DEBOUNCE_TIME, BENCHMARK_SIZE);
-const [toggleLoop] = microloop(BENCHMARK_DEBOUNCE_TIME, BENCHMARK_TOGGLE_SIZE);
-
 const benchmark = (fn: () => void) => {
-  const start = performance.now();
-  loop(fn).then(() => console.log(`Profiling done in ${performance.now() - start}ms.`));
+  return evaluate(fn, BENCHMARK_SIZE);
 };
 
 const toggleBenchmark = (fn: () => void) => {
-  const start = performance.now();
-  toggleLoop(fn).then(() => console.log(`Toggle profiling done in ${performance.now() - start}ms.`));
+  return evaluate(fn, BENCHMARK_TOGGLE_SIZE);
 };
 
 export default function Complex() {

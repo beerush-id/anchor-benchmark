@@ -1,14 +1,14 @@
 import { Eye, MessageSquare, Heart, Trash2, BarChart2, Folder, Tag, User, Calendar, Hash, Reply } from 'lucide-react';
 import {
-  BENCHMARK_DEBOUNCE_TIME,
   BENCHMARK_SIZE,
   BENCHMARK_TOGGLE_SIZE,
   type Post,
   type Category,
   type Tag as TagType,
   type ComplexState,
+  evaluate,
 } from '@anchor-benchmark/shared';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import RAWJson from './dummyContent.json';
 
 // Add typings to the dummy data.
@@ -42,42 +42,219 @@ const debugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
   }
 };
 
+// Custom state update hooks
+const useComplexState = (setState: React.Dispatch<React.SetStateAction<ComplexState>>) => {
+  const updatePostViews = useCallback(
+    (postId: string, increment: number) => {
+      setState((prev) => {
+        const newPosts = [...prev.posts];
+        const index = newPosts.findIndex((p) => p.id === postId);
+        if (index !== -1) {
+          newPosts[index] = { ...newPosts[index], views: newPosts[index].views + increment };
+        }
+        return { ...prev, posts: newPosts };
+      });
+    },
+    [setState]
+  );
+
+  const addPostLike = useCallback(
+    (postId: string) => {
+      setState((prev) => {
+        const newPosts = [...prev.posts];
+        const postIndex = newPosts.findIndex((p) => p.id === postId);
+        if (postIndex !== -1) {
+          const newLikes = [...newPosts[postIndex].likes, shortId()];
+          newPosts[postIndex] = { ...newPosts[postIndex], likes: newLikes };
+        }
+        return { ...prev, posts: newPosts };
+      });
+    },
+    [setState]
+  );
+
+  const addPostComment = useCallback(
+    (postId: string) => {
+      setState((prev) => {
+        const newPosts = [...prev.posts];
+        const postIndex = newPosts.findIndex((p) => p.id === postId);
+        if (postIndex !== -1) {
+          const newComments = [
+            ...newPosts[postIndex].comments,
+            {
+              ...structuredClone(dummyContent.posts[0].comments[0]),
+              id: shortId(),
+            },
+          ];
+          newPosts[postIndex] = { ...newPosts[postIndex], comments: newComments };
+        }
+        return { ...prev, posts: newPosts };
+      });
+    },
+    [setState]
+  );
+
+  const deletePost = useCallback(
+    (postId: string) => {
+      setState((prev) => {
+        const newPosts = [...prev.posts];
+        const index = newPosts.findIndex((p) => p.id === postId);
+        if (index !== -1) {
+          newPosts.splice(index, 1);
+        }
+        return { ...prev, posts: newPosts };
+      });
+    },
+    [setState]
+  );
+
+  const addCommentLike = useCallback(
+    (postId: string, commentId: string) => {
+      setState((prev) => {
+        const newPosts = [...prev.posts];
+        const postIndex = newPosts.findIndex((p) => p.id === postId);
+        if (postIndex !== -1) {
+          const newComments = [...newPosts[postIndex].comments];
+          const commentIndex = newComments.findIndex((c) => c.id === commentId);
+          if (commentIndex !== -1) {
+            const newLikes = [...newComments[commentIndex].likes, shortId()];
+            newComments[commentIndex] = { ...newComments[commentIndex], likes: newLikes };
+            newPosts[postIndex] = { ...newPosts[postIndex], comments: newComments };
+          }
+        }
+        return { ...prev, posts: newPosts };
+      });
+    },
+    [setState]
+  );
+
+  const addCommentReply = useCallback(
+    (postId: string, commentId: string) => {
+      setState((prev) => {
+        const newPosts = [...prev.posts];
+        const postIndex = newPosts.findIndex((p) => p.id === postId);
+        if (postIndex !== -1) {
+          const newComments = [...newPosts[postIndex].comments];
+          const commentIndex = newComments.findIndex((c) => c.id === commentId);
+          if (commentIndex !== -1) {
+            const newReplies = [
+              ...newComments[commentIndex].replies,
+              {
+                ...structuredClone(dummyContent.posts[0].comments[0]),
+                id: shortId(),
+              },
+            ];
+            newComments[commentIndex] = { ...newComments[commentIndex], replies: newReplies };
+            newPosts[postIndex] = { ...newPosts[postIndex], comments: newComments };
+          }
+        }
+        return { ...prev, posts: newPosts };
+      });
+    },
+    [setState]
+  );
+
+  const addReplyLike = useCallback(
+    (postId: string, commentId: string, replyId: string) => {
+      setState((prev) => {
+        const newPosts = [...prev.posts];
+        const postIndex = newPosts.findIndex((p) => p.id === postId);
+        if (postIndex !== -1) {
+          const newComments = [...newPosts[postIndex].comments];
+          const commentIndex = newComments.findIndex((c) => c.id === commentId);
+          if (commentIndex !== -1) {
+            const newReplies = [...newComments[commentIndex].replies];
+            const replyIndex = newReplies.findIndex((r) => r.id === replyId);
+            if (replyIndex !== -1) {
+              const newLikes = [...newReplies[replyIndex].likes, shortId()];
+              newReplies[replyIndex] = { ...newReplies[replyIndex], likes: newLikes };
+              newComments[commentIndex] = { ...newComments[commentIndex], replies: newReplies };
+              newPosts[postIndex] = { ...newPosts[postIndex], comments: newComments };
+            }
+          }
+        }
+        return { ...prev, posts: newPosts };
+      });
+    },
+    [setState]
+  );
+
+  const deleteCategory = useCallback(
+    (categoryId: string) => {
+      setState((prev) => {
+        const newCategories = [...prev.categories];
+        const index = newCategories.findIndex((c) => c.id === categoryId);
+        if (index !== -1) {
+          newCategories.splice(index, 1);
+        }
+        return { ...prev, categories: newCategories };
+      });
+    },
+    [setState]
+  );
+
+  const deleteTag = useCallback(
+    (tagId: string) => {
+      setState((prev) => {
+        const newTags = [...prev.tags];
+        const index = newTags.findIndex((t) => t.id === tagId);
+        if (index !== -1) {
+          newTags.splice(index, 1);
+        }
+        return { ...prev, tags: newTags };
+      });
+    },
+    [setState]
+  );
+
+  const addPost = useCallback(() => {
+    setState((prev) => {
+      const newPosts = [...prev.posts];
+      newPosts.push(structuredClone({ ...dummyContent.posts[0], id: shortId() }));
+      return { ...prev, posts: newPosts };
+    });
+  }, [setState]);
+
+  const addCategory = useCallback(() => {
+    setState((prev) => {
+      const newCategories = [...prev.categories];
+      newCategories.push(structuredClone({ ...dummyContent.categories[0], id: shortId() }));
+      return { ...prev, categories: newCategories };
+    });
+  }, [setState]);
+
+  const addTag = useCallback(() => {
+    setState((prev) => {
+      const newTags = [...prev.tags];
+      newTags.push(structuredClone({ ...dummyContent.tags[0], id: shortId() }));
+      return { ...prev, tags: newTags };
+    });
+  }, [setState]);
+
+  return {
+    updatePostViews,
+    addPostLike,
+    addPostComment,
+    deletePost,
+    addCommentLike,
+    addCommentReply,
+    addReplyLike,
+    deleteCategory,
+    deleteTag,
+    addPost,
+    addCategory,
+    addTag,
+  };
+};
+
 // Benchmark functions
 const useBenchmark = () => {
   const benchmark = (fn: () => void) => {
-    const start = performance.now();
-    let count = 0;
-
-    const executeNext = () => {
-      if (count < BENCHMARK_SIZE) {
-        fn();
-        count++;
-        setTimeout(executeNext, BENCHMARK_DEBOUNCE_TIME);
-      } else {
-        const end = performance.now();
-        console.log(`Profiling done in ${end - start}ms.`);
-      }
-    };
-
-    executeNext();
+    return evaluate(fn, BENCHMARK_SIZE);
   };
 
   const toggleBenchmark = (fn: () => void) => {
-    const start = performance.now();
-    let count = 0;
-
-    const executeNext = () => {
-      if (count < BENCHMARK_TOGGLE_SIZE) {
-        fn();
-        count++;
-        setTimeout(executeNext, BENCHMARK_DEBOUNCE_TIME);
-      } else {
-        const end = performance.now();
-        console.log(`Toggle profiling done in ${end - start}ms.`);
-      }
-    };
-
-    executeNext();
+    return evaluate(fn, BENCHMARK_TOGGLE_SIZE);
   };
 
   return { benchmark, toggleBenchmark };
@@ -86,6 +263,7 @@ const useBenchmark = () => {
 export default function Complex() {
   const ref = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<ComplexState>(structuredClone(dummyContent) as ComplexState);
+  const stateUpdaters = useComplexState(setState);
 
   useEffect(() => {
     debugRender(ref);
@@ -96,10 +274,10 @@ export default function Complex() {
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
           <div className="lg:col-span-7">
-            <PostsSection state={state} setState={setState} />
+            <PostsSection state={state} stateUpdaters={stateUpdaters} />
           </div>
           <div className="lg:col-span-3">
-            <CategoriesAndTagsSection state={state} setState={setState} />
+            <CategoriesAndTagsSection state={state} stateUpdaters={stateUpdaters} />
           </div>
         </div>
 
@@ -115,10 +293,10 @@ export default function Complex() {
 
 const PostsSection = ({
   state,
-  setState,
+  stateUpdaters,
 }: {
   state: ComplexState;
-  setState: React.Dispatch<React.SetStateAction<ComplexState>>;
+  stateUpdaters: ReturnType<typeof useComplexState>;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const { benchmark } = useBenchmark();
@@ -127,15 +305,11 @@ const PostsSection = ({
     debugRender(ref);
   });
 
-  const addPosts = () => {
+  const addPosts = useCallback(() => {
     benchmark(() => {
-      setState((prev) => {
-        const newPosts = [...prev.posts];
-        newPosts.push(structuredClone({ ...dummyContent.posts[0], id: shortId() }));
-        return { ...prev, posts: newPosts };
-      });
+      stateUpdaters.addPost();
     });
-  };
+  }, [benchmark, stateUpdaters]);
 
   return (
     <div ref={ref} className="bg-white rounded-2xl shadow-xs p-6 h-full">
@@ -152,17 +326,17 @@ const PostsSection = ({
           Add {BENCHMARK_SIZE.toLocaleString()} Posts
         </button>
       </div>
-      <PostList state={state} setState={setState} />
+      <PostList state={state} stateUpdaters={stateUpdaters} />
     </div>
   );
 };
 
 const PostList = ({
   state,
-  setState,
+  stateUpdaters,
 }: {
   state: ComplexState;
-  setState: React.Dispatch<React.SetStateAction<ComplexState>>;
+  stateUpdaters: ReturnType<typeof useComplexState>;
 }) => {
   const ref = useRef<HTMLUListElement>(null);
 
@@ -177,226 +351,170 @@ const PostList = ({
   return (
     <ul ref={ref} className="mt-2">
       {state.posts.map((post) => (
-        <PostItem key={post.id} item={post} state={state} setState={setState} />
+        <PostItem key={post.id} item={post} stateUpdaters={stateUpdaters} />
       ))}
     </ul>
   );
 };
 
-const PostItem = memo(
-  ({
-    item,
-    state,
-    setState,
-  }: {
-    item: Post;
-    state: ComplexState;
-    setState: React.Dispatch<React.SetStateAction<ComplexState>>;
-  }) => {
-    const ref = useRef<HTMLLIElement>(null);
-    const { toggleBenchmark } = useBenchmark();
+const PostItem = memo(({ item, stateUpdaters }: { item: Post; stateUpdaters: ReturnType<typeof useComplexState> }) => {
+  const ref = useRef<HTMLLIElement>(null);
+  const { toggleBenchmark } = useBenchmark();
+
+  useEffect(() => {
+    debugRender(ref);
+  });
+
+  const incrementViews = useCallback(() => {
+    stateUpdaters.updatePostViews(item.id, 1);
+  }, [stateUpdaters, item.id]);
+
+  const addLike = useCallback(() => {
+    stateUpdaters.addPostLike(item.id);
+  }, [stateUpdaters, item.id]);
+
+  const addComment = useCallback(() => {
+    stateUpdaters.addPostComment(item.id);
+  }, [stateUpdaters, item.id]);
+
+  const deletePost = useCallback(() => {
+    stateUpdaters.deletePost(item.id);
+  }, [stateUpdaters, item.id]);
+
+  const PostStats = memo(() => {
+    const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
       debugRender(ref);
     });
 
-    const incrementViews = () => {
-      setState((prev) => {
-        const newPosts = [...prev.posts];
-        const index = newPosts.findIndex((p) => p.id === item.id);
-        if (index !== -1) {
-          newPosts[index] = { ...newPosts[index], views: newPosts[index].views + 1 };
-        }
-        return { ...prev, posts: newPosts };
-      });
-    };
+    return (
+      <div ref={ref} className="flex flex-wrap gap-2 mb-3">
+        <span className="font-medium text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full flex items-center gap-1">
+          <Eye size={14} /> {item.views.toLocaleString()}
+        </span>
+        <span className="font-medium text-xs bg-red-100 text-red-800 px-3 py-1 rounded-full flex items-center gap-1">
+          <Heart size={14} /> {item.likes.length.toLocaleString()}
+        </span>
+        <span className="font-medium text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center gap-1">
+          <MessageSquare size={14} /> {item.comments.length.toLocaleString()}
+        </span>
+        <span className="font-medium text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded-full">{item.status}</span>
+      </div>
+    );
+  });
 
-    const addLike = () => {
-      setState((prev) => {
-        const newPosts = [...prev.posts];
-        const postIndex = newPosts.findIndex((p) => p.id === item.id);
-        if (postIndex !== -1) {
-          const newLikes = [...newPosts[postIndex].likes, shortId()];
-          newPosts[postIndex] = { ...newPosts[postIndex], likes: newLikes };
-        }
-        return { ...prev, posts: newPosts };
-      });
-    };
+  const PostInfo = memo(() => {
+    const ref = useRef<HTMLDivElement>(null);
 
-    const addComment = () => {
-      setState((prev) => {
-        const newPosts = [...prev.posts];
-        const postIndex = newPosts.findIndex((p) => p.id === item.id);
-        if (postIndex !== -1) {
-          const newComments = [
-            ...newPosts[postIndex].comments,
-            {
-              ...structuredClone(dummyContent.posts[0].comments[0]),
-              id: shortId(),
-            },
-          ];
-          newPosts[postIndex] = { ...newPosts[postIndex], comments: newComments };
-        }
-        return { ...prev, posts: newPosts };
-      });
-    };
-
-    const deletePost = () => {
-      setState((prev) => {
-        const newPosts = [...prev.posts];
-        const index = newPosts.findIndex((p) => p.id === item.id);
-        if (index !== -1) {
-          newPosts.splice(index, 1);
-        }
-        return { ...prev, posts: newPosts };
-      });
-    };
-
-    const PostStats = memo(() => {
-      const ref = useRef<HTMLDivElement>(null);
-
-      useEffect(() => {
-        debugRender(ref);
-      });
-
-      return (
-        <div ref={ref} className="flex flex-wrap gap-2 mb-3">
-          <span className="font-medium text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full flex items-center gap-1">
-            <Eye size={14} /> {item.views.toLocaleString()}
-          </span>
-          <span className="font-medium text-xs bg-red-100 text-red-800 px-3 py-1 rounded-full flex items-center gap-1">
-            <Heart size={14} /> {item.likes.length.toLocaleString()}
-          </span>
-          <span className="font-medium text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center gap-1">
-            <MessageSquare size={14} /> {item.comments.length.toLocaleString()}
-          </span>
-          <span className="font-medium text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded-full">
-            {item.status}
-          </span>
-        </div>
-      );
-    });
-
-    const PostInfo = memo(() => {
-      const ref = useRef<HTMLDivElement>(null);
-
-      useEffect(() => {
-        debugRender(ref);
-      });
-
-      return (
-        <div ref={ref} className="flex flex-col bg-gray-50 p-4 rounded-lg">
-          <div className="flex items-start gap-4">
-            <div className="bg-gray-200 border-2 border-dashed rounded-xl w-16 h-16 flex-shrink-0" />
-            <div className="flex-1">
-              <h3 className="font-bold text-gray-800 text-xl mb-2">{item.title}</h3>
-              <PostStats />
-              <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 mb-3">
-                <span className="flex items-center gap-1">
-                  <User size={14} /> {item.metadata.lastEditor.username}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Calendar size={14} /> {new Date(item.createdAt).toLocaleDateString()}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Hash size={14} /> {item.tags.length} tags
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 text-gray-700">{item.content.substring(0, 300)}...</div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {item.tags.map((tag, index) => (
-              <span key={index} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                #{tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      );
-    });
-
-    const PostComments = memo(() => {
-      const ref = useRef<HTMLDivElement>(null);
-      const displayedComments = item.comments.slice(0, 5);
-
-      useEffect(() => {
-        debugRender(ref);
-      });
-
-      return (
-        <>
-          {displayedComments.length > 0 && (
-            <div ref={ref} className="mt-4 ml-2 pl-4 border-l-2 border-gray-200 flex flex-col gap-3">
-              <h4 className="font-semibold text-gray-700 flex items-center gap-2">
-                <MessageSquare size={16} />
-                Comments ({item.comments.length.toLocaleString()})
-              </h4>
-              {displayedComments.map(
-                (comment, index) =>
-                  index < 5 && (
-                    <CommentItem
-                      key={comment.id}
-                      comment={comment}
-                      postId={item.id}
-                      state={state}
-                      setState={setState}
-                    />
-                  )
-              )}
-            </div>
-          )}
-        </>
-      );
+    useEffect(() => {
+      debugRender(ref);
     });
 
     return (
-      <li ref={ref} className="mb-6 last:mb-0">
-        <PostInfo />
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
-          <button
-            onClick={() => toggleBenchmark(incrementViews)}
-            className="px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-1">
-            <Eye size={16} />
-            View ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
-          </button>
-          <button
-            onClick={() => toggleBenchmark(addLike)}
-            className="px-3 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-1">
-            <Heart size={16} />
-            Like ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
-          </button>
-          <button
-            onClick={() => toggleBenchmark(addComment)}
-            className="px-3 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-1">
-            <MessageSquare size={16} />
-            Comment ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
-          </button>
-          <button
-            onClick={deletePost}
-            className="px-3 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-1">
-            <Trash2 size={16} />
-          </button>
+      <div ref={ref} className="flex flex-col bg-gray-50 p-4 rounded-lg">
+        <div className="flex items-start gap-4">
+          <div className="bg-gray-200 border-2 border-dashed rounded-xl w-16 h-16 flex-shrink-0" />
+          <div className="flex-1">
+            <h3 className="font-bold text-gray-800 text-xl mb-2">{item.title}</h3>
+            <PostStats />
+            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 mb-3">
+              <span className="flex items-center gap-1">
+                <User size={14} /> {item.metadata.lastEditor.username}
+              </span>
+              <span className="flex items-center gap-1">
+                <Calendar size={14} /> {new Date(item.createdAt).toLocaleDateString()}
+              </span>
+              <span className="flex items-center gap-1">
+                <Hash size={14} /> {item.tags.length} tags
+              </span>
+            </div>
+          </div>
         </div>
-        <PostComments />
-      </li>
+
+        <div className="mt-4 text-gray-700">{item.content.substring(0, 300)}...</div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {item.tags.map((tag, index) => (
+            <span key={index} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+              #{tag}
+            </span>
+          ))}
+        </div>
+      </div>
     );
-  }
-);
+  });
+
+  const PostComments = memo(() => {
+    const ref = useRef<HTMLDivElement>(null);
+    const displayedComments = item.comments.slice(0, 5);
+
+    useEffect(() => {
+      debugRender(ref);
+    });
+
+    return (
+      <>
+        {displayedComments.length > 0 && (
+          <div ref={ref} className="mt-4 ml-2 pl-4 border-l-2 border-gray-200 flex flex-col gap-3">
+            <h4 className="font-semibold text-gray-700 flex items-center gap-2">
+              <MessageSquare size={16} />
+              Comments ({item.comments.length.toLocaleString()})
+            </h4>
+            {displayedComments.map(
+              (comment, index) =>
+                index < 5 && (
+                  <CommentItem key={comment.id} comment={comment} postId={item.id} stateUpdaters={stateUpdaters} />
+                )
+            )}
+          </div>
+        )}
+      </>
+    );
+  });
+
+  return (
+    <li ref={ref} className="mb-6 last:mb-0">
+      <PostInfo />
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
+        <button
+          onClick={() => toggleBenchmark(incrementViews)}
+          className="px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-1">
+          <Eye size={16} />
+          View ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
+        </button>
+        <button
+          onClick={() => toggleBenchmark(addLike)}
+          className="px-3 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-1">
+          <Heart size={16} />
+          Like ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
+        </button>
+        <button
+          onClick={() => toggleBenchmark(addComment)}
+          className="px-3 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-1">
+          <MessageSquare size={16} />
+          Comment ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
+        </button>
+        <button
+          onClick={deletePost}
+          className="px-3 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-1">
+          <Trash2 size={16} />
+        </button>
+      </div>
+      <PostComments />
+    </li>
+  );
+});
 
 const CommentItem = memo(
   ({
     comment,
     postId,
-    state,
-    setState,
+    stateUpdaters,
   }: {
     comment: Post['comments'][number];
     postId: string;
-    state: ComplexState;
-    setState: React.Dispatch<React.SetStateAction<ComplexState>>;
+    stateUpdaters: ReturnType<typeof useComplexState>;
   }) => {
     const ref = useRef<HTMLDivElement>(null);
     const { toggleBenchmark } = useBenchmark();
@@ -405,49 +523,17 @@ const CommentItem = memo(
       debugRender(ref);
     });
 
-    const addLike = () => {
-      setState((prev) => {
-        const newPosts = [...prev.posts];
-        const postIndex = newPosts.findIndex((p) => p.id === postId);
-        if (postIndex !== -1) {
-          const newComments = [...newPosts[postIndex].comments];
-          const commentIndex = newComments.findIndex((c) => c.id === comment.id);
-          if (commentIndex !== -1) {
-            const newLikes = [...newComments[commentIndex].likes, shortId()];
-            newComments[commentIndex] = { ...newComments[commentIndex], likes: newLikes };
-            newPosts[postIndex] = { ...newPosts[postIndex], comments: newComments };
-          }
-        }
-        return { ...prev, posts: newPosts };
-      });
-    };
+    const addLike = useCallback(() => {
+      stateUpdaters.addCommentLike(postId, comment.id);
+    }, [stateUpdaters, postId, comment.id]);
 
-    const addReply = () => {
-      setState((prev) => {
-        const newPosts = [...prev.posts];
-        const postIndex = newPosts.findIndex((p) => p.id === postId);
-        if (postIndex !== -1) {
-          const newComments = [...newPosts[postIndex].comments];
-          const commentIndex = newComments.findIndex((c) => c.id === comment.id);
-          if (commentIndex !== -1) {
-            const newReplies = [
-              ...newComments[commentIndex].replies,
-              {
-                ...structuredClone(dummyContent.posts[0].comments[0]),
-                id: shortId(),
-              },
-            ];
-            newComments[commentIndex] = { ...newComments[commentIndex], replies: newReplies };
-            newPosts[postIndex] = { ...newPosts[postIndex], comments: newComments };
-          }
-        }
-        return { ...prev, posts: newPosts };
-      });
-    };
+    const addReply = useCallback(() => {
+      stateUpdaters.addCommentReply(postId, comment.id);
+    }, [stateUpdaters, postId, comment.id]);
 
-    const deleteComment = () => {
+    const deleteComment = useCallback(() => {
       console.log('Delete comment', comment.id);
-    };
+    }, [comment.id]);
 
     const CommentStats = memo(() => {
       const ref = useRef<HTMLDivElement>(null);
@@ -496,8 +582,7 @@ const CommentItem = memo(
                     reply={reply}
                     postId={postId}
                     commentId={comment.id}
-                    state={state}
-                    setState={setState}
+                    stateUpdaters={stateUpdaters}
                   />
                 ))}
               </div>
@@ -536,13 +621,12 @@ const ReplyItem = memo(
     reply,
     postId,
     commentId,
-    setState,
+    stateUpdaters,
   }: {
     reply: Post['comments'][number]['replies'][number];
     postId: string;
     commentId: string;
-    state: ComplexState;
-    setState: React.Dispatch<React.SetStateAction<ComplexState>>;
+    stateUpdaters: ReturnType<typeof useComplexState>;
   }) => {
     const ref = useRef<HTMLDivElement>(null);
     const { toggleBenchmark } = useBenchmark();
@@ -551,31 +635,13 @@ const ReplyItem = memo(
       debugRender(ref);
     });
 
-    const addLike = () => {
-      setState((prev) => {
-        const newPosts = [...prev.posts];
-        const postIndex = newPosts.findIndex((p) => p.id === postId);
-        if (postIndex !== -1) {
-          const newComments = [...newPosts[postIndex].comments];
-          const commentIndex = newComments.findIndex((c) => c.id === commentId);
-          if (commentIndex !== -1) {
-            const newReplies = [...newComments[commentIndex].replies];
-            const replyIndex = newReplies.findIndex((r) => r.id === reply.id);
-            if (replyIndex !== -1) {
-              const newLikes = [...newReplies[replyIndex].likes, shortId()];
-              newReplies[replyIndex] = { ...newReplies[replyIndex], likes: newLikes };
-              newComments[commentIndex] = { ...newComments[commentIndex], replies: newReplies };
-              newPosts[postIndex] = { ...newPosts[postIndex], comments: newComments };
-            }
-          }
-        }
-        return { ...prev, posts: newPosts };
-      });
-    };
+    const addLike = useCallback(() => {
+      stateUpdaters.addReplyLike(postId, commentId, reply.id);
+    }, [stateUpdaters, postId, commentId, reply.id]);
 
-    const deleteReply = () => {
+    const deleteReply = useCallback(() => {
       console.log('Delete reply', reply.id);
-    };
+    }, [reply.id]);
 
     const LikesCount = memo(() => {
       const ref = useRef<HTMLButtonElement>(null);
@@ -649,10 +715,10 @@ const ComplexStats = memo(({ state }: { state: ComplexState }) => {
 
 const CategoriesAndTagsSection = ({
   state,
-  setState,
+  stateUpdaters,
 }: {
   state: ComplexState;
-  setState: React.Dispatch<React.SetStateAction<ComplexState>>;
+  stateUpdaters: ReturnType<typeof useComplexState>;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const { benchmark } = useBenchmark();
@@ -661,25 +727,17 @@ const CategoriesAndTagsSection = ({
     debugRender(ref);
   });
 
-  const addCategories = () => {
+  const addCategories = useCallback(() => {
     benchmark(() => {
-      setState((prev) => {
-        const newCategories = [...prev.categories];
-        newCategories.push(structuredClone({ ...dummyContent.categories[0], id: shortId() }));
-        return { ...prev, categories: newCategories };
-      });
+      stateUpdaters.addCategory();
     });
-  };
+  }, [benchmark, stateUpdaters]);
 
-  const addTags = () => {
+  const addTags = useCallback(() => {
     benchmark(() => {
-      setState((prev) => {
-        const newTags = [...prev.tags];
-        newTags.push(structuredClone({ ...dummyContent.tags[0], id: shortId() }));
-        return { ...prev, tags: newTags };
-      });
+      stateUpdaters.addTag();
     });
-  };
+  }, [benchmark, stateUpdaters]);
 
   return (
     <div ref={ref} className="space-y-6">
@@ -703,7 +761,7 @@ const CategoriesAndTagsSection = ({
           </button>
         </div>
         <div className="max-h-[512px] overflow-y-auto pr-2">
-          <CategoryList state={state} setState={setState} />
+          <CategoryList state={state} stateUpdaters={stateUpdaters} />
         </div>
       </div>
 
@@ -723,7 +781,7 @@ const CategoriesAndTagsSection = ({
           </button>
         </div>
         <div className="max-h-[512px] overflow-y-auto pr-2">
-          <TagList state={state} setState={setState} />
+          <TagList state={state} stateUpdaters={stateUpdaters} />
         </div>
       </div>
     </div>
@@ -732,10 +790,10 @@ const CategoriesAndTagsSection = ({
 
 const CategoryList = ({
   state,
-  setState,
+  stateUpdaters,
 }: {
   state: ComplexState;
-  setState: React.Dispatch<React.SetStateAction<ComplexState>>;
+  stateUpdaters: ReturnType<typeof useComplexState>;
 }) => {
   const ref = useRef<HTMLUListElement>(null);
 
@@ -750,37 +808,23 @@ const CategoryList = ({
   return (
     <ul ref={ref} className="mt-2">
       {state.categories.map((category) => (
-        <CategoryItem key={category.id} item={category} state={state} setState={setState} />
+        <CategoryItem key={category.id} item={category} stateUpdaters={stateUpdaters} />
       ))}
     </ul>
   );
 };
 
 const CategoryItem = memo(
-  ({
-    item,
-    setState,
-  }: {
-    item: Category;
-    state: ComplexState;
-    setState: React.Dispatch<React.SetStateAction<ComplexState>>;
-  }) => {
+  ({ item, stateUpdaters }: { item: Category; stateUpdaters: ReturnType<typeof useComplexState> }) => {
     const ref = useRef<HTMLLIElement>(null);
 
     useEffect(() => {
       debugRender(ref);
     });
 
-    const deleteCategory = () => {
-      setState((prev) => {
-        const newCategories = [...prev.categories];
-        const index = newCategories.findIndex((c) => c.id === item.id);
-        if (index !== -1) {
-          newCategories.splice(index, 1);
-        }
-        return { ...prev, categories: newCategories };
-      });
-    };
+    const deleteCategory = useCallback(() => {
+      stateUpdaters.deleteCategory(item.id);
+    }, [stateUpdaters, item.id]);
 
     return (
       <li ref={ref} className="flex items-center justify-between gap-3 bg-gray-50 p-4 rounded-lg mb-3 last:mb-0">
@@ -810,10 +854,10 @@ const CategoryItem = memo(
 
 const TagList = ({
   state,
-  setState,
+  stateUpdaters,
 }: {
   state: ComplexState;
-  setState: React.Dispatch<React.SetStateAction<ComplexState>>;
+  stateUpdaters: ReturnType<typeof useComplexState>;
 }) => {
   const ref = useRef<HTMLUListElement>(null);
 
@@ -828,37 +872,23 @@ const TagList = ({
   return (
     <ul ref={ref} className="mt-2">
       {state.tags.map((tag) => (
-        <TagItem key={tag.id} item={tag} state={state} setState={setState} />
+        <TagItem key={tag.id} item={tag} stateUpdaters={stateUpdaters} />
       ))}
     </ul>
   );
 };
 
 const TagItem = memo(
-  ({
-    item,
-    setState,
-  }: {
-    item: TagType;
-    state: ComplexState;
-    setState: React.Dispatch<React.SetStateAction<ComplexState>>;
-  }) => {
+  ({ item, stateUpdaters }: { item: TagType; stateUpdaters: ReturnType<typeof useComplexState> }) => {
     const ref = useRef<HTMLLIElement>(null);
 
     useEffect(() => {
       debugRender(ref);
     });
 
-    const deleteTag = () => {
-      setState((prev) => {
-        const newTags = [...prev.tags];
-        const index = newTags.findIndex((t) => t.id === item.id);
-        if (index !== -1) {
-          newTags.splice(index, 1);
-        }
-        return { ...prev, tags: newTags };
-      });
-    };
+    const deleteTag = useCallback(() => {
+      stateUpdaters.deleteTag(item.id);
+    }, [stateUpdaters, item.id]);
 
     return (
       <li ref={ref} className="flex items-center justify-between gap-3 bg-gray-50 p-4 rounded-lg mb-3 last:mb-0">

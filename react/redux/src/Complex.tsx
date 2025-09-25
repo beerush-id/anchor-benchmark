@@ -1,12 +1,12 @@
 import { Eye, MessageSquare, Heart, Trash2, BarChart2, Folder, Tag, User, Calendar, Hash, Reply } from 'lucide-react';
 import {
-  BENCHMARK_DEBOUNCE_TIME,
   BENCHMARK_SIZE,
   BENCHMARK_TOGGLE_SIZE,
   type Post,
   type Category,
   type Tag as TagType,
   type ComplexState,
+  evaluate,
 } from '@anchor-benchmark/shared';
 import { useSelector, useDispatch } from 'react-redux';
 import { memo, useEffect, useRef } from 'react';
@@ -63,39 +63,11 @@ const useBenchmark = () => {
   const dispatch: AppDispatch = useDispatch();
 
   const benchmark = (fn: () => void) => {
-    const start = performance.now();
-    let count = 0;
-
-    const executeNext = () => {
-      if (count < BENCHMARK_SIZE) {
-        fn();
-        count++;
-        setTimeout(executeNext, BENCHMARK_DEBOUNCE_TIME);
-      } else {
-        const end = performance.now();
-        console.log(`Profiling done in ${end - start}ms.`);
-      }
-    };
-
-    executeNext();
+    return evaluate(fn, BENCHMARK_SIZE);
   };
 
   const toggleBenchmark = (fn: () => void) => {
-    const start = performance.now();
-    let count = 0;
-
-    const executeNext = () => {
-      if (count < BENCHMARK_TOGGLE_SIZE) {
-        fn();
-        count++;
-        setTimeout(executeNext, BENCHMARK_DEBOUNCE_TIME);
-      } else {
-        const end = performance.now();
-        console.log(`Toggle profiling done in ${end - start}ms.`);
-      }
-    };
-
-    executeNext();
+    return evaluate(fn, BENCHMARK_TOGGLE_SIZE);
   };
 
   return { benchmark, toggleBenchmark, dispatch };
