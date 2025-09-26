@@ -1,7 +1,7 @@
 import { createBrowserRouter, RouterProvider } from 'react-router';
 import './App.css';
 import Home from './Home';
-import Complex from './Complex';
+import Complex from './Complex.js';
 
 const router = createBrowserRouter([
   {

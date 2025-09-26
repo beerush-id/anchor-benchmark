@@ -1,21 +1,22 @@
 import { debugRender, useObservedList, useWriter } from '@anchorlib/react';
 import { observable, observe } from '@anchorlib/react/view';
-import { anchor, shortId } from '@anchorlib/core';
-import { Eye, MessageSquare, Heart, Trash2, BarChart2, Folder, Tag, User, Calendar, Hash, Reply } from 'lucide-react';
+import { anchor } from '@anchorlib/core';
+import { BarChart2, Calendar, Eye, Folder, Hash, Heart, MessageSquare, Reply, Tag, Trash2, User } from 'lucide-react';
 import {
   BENCHMARK_SIZE,
   BENCHMARK_TOGGLE_SIZE,
-  type Post,
   type Category,
-  type Tag as TagType,
   type ComplexState,
   evaluate,
+  type Post,
+  shortId,
+  type Tag as TagType,
 } from '@anchor-benchmark/shared';
 import { memo, useRef } from 'react';
-import RAWJson from './dummyContent.json';
+import dummyData from '@anchor-benchmark/shared/data/dummy-data.json';
 
 // Add typings to the dummy data.
-const dummyContent = RAWJson as unknown as ComplexState;
+const dummyContent = dummyData as unknown as ComplexState;
 
 // Initialize the complex state with more complex nested data
 const complexApp = anchor.immutable(structuredClone(dummyContent) as ComplexState);
