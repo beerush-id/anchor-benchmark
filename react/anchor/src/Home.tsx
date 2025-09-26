@@ -1,11 +1,12 @@
-import { debugRender, useAnchor, useObservedList, useVariable, useWriter } from '@anchorlib/react';
+import { debugRender, useObservedList, useWriter } from '@anchorlib/react';
 import { observable, observe } from '@anchorlib/react/view';
-import { anchor, microloop, shortId } from '@anchorlib/core';
+import { anchor } from '@anchorlib/core';
 import { Plus } from 'lucide-react';
 import {
-  BENCHMARK_DEBOUNCE_TIME,
   BENCHMARK_SIZE,
   BENCHMARK_TOGGLE_SIZE,
+  evaluate,
+  shortId,
   type Todo,
   type TodosState,
 } from '@anchor-benchmark/shared';
@@ -22,9 +23,9 @@ export default function Home() {
   );
 }
 
-const Counter = observable(() => {
-  const [counter] = useAnchor({ count: 0 });
+const counter = anchor({ count: 0 });
 
+const Counter = observable(() => {
   return (
     <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full mx-4">
       <div className="text-center">
@@ -59,10 +60,10 @@ const Counter = observable(() => {
   );
 });
 
-const todoApp = anchor.immutable({
+const todoState = anchor.immutable({
   items: [
     {
-      id: '1',
+      id: shortId(),
       title: 'Learn React state',
       completed: true,
       createdAt: new Date(),
@@ -71,7 +72,7 @@ const todoApp = anchor.immutable({
       tags: ['learning'],
     },
     {
-      id: '2',
+      id: shortId(),
       title: 'Learn Anchor states',
       completed: false,
       createdAt: new Date(),
@@ -80,7 +81,7 @@ const todoApp = anchor.immutable({
       tags: ['learning', 'anchor'],
     },
     {
-      id: '3',
+      id: shortId(),
       title: 'Master Anchor state',
       completed: false,
       createdAt: new Date(),
@@ -92,42 +93,61 @@ const todoApp = anchor.immutable({
   filter: 'all',
   sortOrder: 'asc',
   sortBy: 'createdAt',
-} satisfies TodosState);
-
-const todoStats = anchor({
+} as TodosState);
+const todoStats = anchor.immutable({
   total: 3,
   completed: 1,
   active: 2,
 });
-const itemsWriter = anchor.writable(todoApp.items, ['push', 'splice']);
+const todoTitle = anchor({ text: '' });
 
-const [loop] = microloop(BENCHMARK_DEBOUNCE_TIME, BENCHMARK_SIZE);
-const [toggleLoop] = microloop(BENCHMARK_DEBOUNCE_TIME, BENCHMARK_TOGGLE_SIZE);
+const stateWriter = anchor.writable(todoState.items, ['push', 'splice']);
+const statsWriter = anchor.writable(todoStats);
 
 const benchmark = (fn: () => void) => {
-  const start = performance.now();
-  loop(fn).then(() => console.log(`Profiling done in ${performance.now() - start}ms.`));
+  return evaluate(fn, BENCHMARK_SIZE);
 };
 
 const toggleBenchmark = (fn: () => void) => {
-  const start = performance.now();
-  toggleLoop(fn).then(() => console.log(`Toggle profiling done in ${performance.now() - start}ms.`));
+  return evaluate(fn, BENCHMARK_TOGGLE_SIZE);
+};
+
+const TodoApp = () => {
+  const ref = useRef<HTMLDivElement>(null);
+  debugRender(ref);
+
+  return (
+    <div ref={ref} className="bg-slate-900 rounded-2xl shadow-xl max-w-md w-full mx-4 flex flex-col gap-4">
+      <div className="px-4 mt-4">
+        <h3 className="font-semibold text-slate-200 flex-1 text-xl mb-10 text-center">Anchor Todo List</h3>
+        <TodoForm />
+      </div>
+      <div className="px-4 max-h-[512px] overflow-y-auto">
+        <TodoList />
+      </div>
+      <div className="px-4">
+        <TodoStats />
+      </div>
+      <p className="text-slate-500 text-xs text-center px-10 mb-4">
+        Stats are computed during mutation to prevent extensive resource usage from filtering. This also to showcase the
+        complexity level of the optimization.
+      </p>
+    </div>
+  );
 };
 
 const TodoForm = () => {
   const ref = useRef<HTMLFormElement>(null);
   debugRender(ref);
 
-  const [newTitle] = useVariable('');
-
   const addTodo = (e: FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (newTitle.value.trim()) {
-      itemsWriter.push({
+    if (todoTitle.text.trim()) {
+      stateWriter.push({
         id: shortId(),
-        title: newTitle.value,
+        title: todoTitle.text,
         completed: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -135,10 +155,10 @@ const TodoForm = () => {
         tags: [],
       });
 
-      todoStats.total++;
-      todoStats.active++;
+      statsWriter.total++;
+      statsWriter.active++;
 
-      newTitle.value = '';
+      todoTitle.text = '';
     }
   };
 
@@ -146,14 +166,14 @@ const TodoForm = () => {
     <>
       <input
         type="text"
-        value={newTitle.value}
-        onChange={(e) => (newTitle.value = e.target.value)}
+        value={todoTitle.text}
+        onChange={(e) => (todoTitle.text = e.target.value)}
         placeholder="Add a new todo..."
         className="text-white px-4 border border-slate-600 bg-slate-800 rounded-md flex-grow"
       />
       <button
         type="submit"
-        disabled={!newTitle.value.trim()}
+        disabled={!todoTitle.text.trim()}
         className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-50">
         <Plus size={16} />
       </button>
@@ -167,15 +187,18 @@ const TodoForm = () => {
         type="button"
         onClick={() =>
           benchmark(() => {
-            itemsWriter.push({
+            stateWriter.push({
               id: shortId(),
-              title: `New Todo (${todoApp.items.length + 1})`,
+              title: `New Todo (${todoState.items.length + 1})`,
               completed: false,
               createdAt: new Date(),
               updatedAt: new Date(),
               priority: 'medium',
               tags: [],
             });
+
+            statsWriter.total++;
+            statsWriter.active++;
           })
         }
         className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300">
@@ -185,32 +208,51 @@ const TodoForm = () => {
   );
 };
 
+const TodoList = () => {
+  const ref = useRef<HTMLUListElement>(null);
+  debugRender(ref);
+
+  const todos = useObservedList(todoState.items as Todo[], 'id');
+
+  if (!todos.length) {
+    return <p className="text-slate-400 text-sm flex items-center justify-center mt-4">No todos yet.</p>;
+  }
+
+  return (
+    <ul ref={ref} className="mt-4 space-y-2">
+      {todos.map((todo) => (
+        <TodoItem key={todo.key} item={todo.value} />
+      ))}
+    </ul>
+  );
+};
+
 const TodoItem = memo(({ item }: { item: Todo }) => {
   const ref = useRef<HTMLLIElement>(null);
   debugRender(ref);
 
-  const itemWriter = useWriter(item, ['completed']);
+  const todoWriter = useWriter(item, ['completed']);
 
   const handleToggle = () => {
-    itemWriter.completed = !itemWriter.completed;
+    todoWriter.completed = !todoWriter.completed;
 
     if (item.completed) {
-      todoStats.completed++;
-      todoStats.active--;
+      statsWriter.completed++;
+      statsWriter.active--;
     } else {
-      todoStats.completed--;
-      todoStats.active++;
+      statsWriter.completed--;
+      statsWriter.active++;
     }
   };
 
   const handleDelete = () => {
-    itemsWriter.splice(itemsWriter.indexOf(item as (typeof todoApp.items)[number]), 1);
-    todoStats.total--;
+    stateWriter.splice(stateWriter.indexOf(item as (typeof todoState.items)[number]), 1);
+    statsWriter.total--;
 
     if (item.completed) {
-      todoStats.completed--;
+      statsWriter.completed--;
     } else {
-      todoStats.active--;
+      statsWriter.active--;
     }
   };
 
@@ -220,16 +262,16 @@ const TodoItem = memo(({ item }: { item: Todo }) => {
     return (
       <div ref={ref} className="flex items-center flex-1 gap-3 bg-slate-800/70 p-2 rounded-md">
         <label className="text-slate-300">
-          <input type="checkbox" checked={itemWriter.completed} onChange={handleToggle} className="sr-only" />
-          {itemWriter.completed ? (
+          <input type="checkbox" checked={todoWriter.completed} onChange={handleToggle} className="sr-only" />
+          {todoWriter.completed ? (
             <span className="text-green-500 cursor-pointer">✓</span>
           ) : (
             <span className="border border-slate-300 w-4 h-4 inline-block cursor-pointer"></span>
           )}
         </label>
         <span
-          className={`text-semibold text-sm ${itemWriter.completed ? 'line-through text-slate-500' : 'text-slate-300'}`}>
-          {itemWriter.title}
+          className={`text-semibold text-sm ${todoWriter.completed ? 'line-through text-slate-500' : 'text-slate-300'}`}>
+          {todoWriter.title}
         </span>
       </div>
     );
@@ -249,25 +291,6 @@ const TodoItem = memo(({ item }: { item: Todo }) => {
     </li>
   );
 });
-
-const TodoList = () => {
-  const ref = useRef<HTMLUListElement>(null);
-  debugRender(ref);
-
-  const todos = useObservedList(todoApp.items as Todo[], 'id');
-
-  if (!todos.length) {
-    return <p className="text-slate-400 text-sm flex items-center justify-center mt-4">No todos yet.</p>;
-  }
-
-  return (
-    <ul ref={ref} className="mt-4 space-y-2">
-      {todos.map((todo) => (
-        <TodoItem key={todo.key} item={todo.value} />
-      ))}
-    </ul>
-  );
-};
 
 const TodoStats = observable(() => {
   const ref = useRef<HTMLDivElement>(null);
@@ -292,23 +315,3 @@ const TodoStats = observable(() => {
     </div>
   );
 }, 'TodoStats');
-
-const TodoApp = () => {
-  const ref = useRef<HTMLDivElement>(null);
-  debugRender(ref);
-
-  return (
-    <div ref={ref} className="bg-slate-900 rounded-2xl shadow-xl max-w-md w-full mx-4">
-      <div className="p-4">
-        <h3 className="font-semibold text-slate-200 flex-1 text-xl mb-10 text-center">Anchor Todo List</h3>
-        <TodoForm />
-        <TodoList />
-      </div>
-      <TodoStats />
-      <p className="text-slate-500 text-xs text-center px-10 mb-4">
-        Stats are computed during mutation to prevent extensive resource usage from filtering. This also to showcase the
-        complexity level of the optimization.
-      </p>
-    </div>
-  );
-};

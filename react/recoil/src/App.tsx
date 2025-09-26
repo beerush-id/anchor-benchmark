@@ -2,20 +2,15 @@ import { createBrowserRouter, RouterProvider } from 'react-router';
 import { RecoilRoot } from 'recoil';
 import './App.css';
 import Home from './Home';
-import Medium from './Medium';
 import Complex from './Complex';
 
 const router = createBrowserRouter([
   {
-    path: "/",
+    path: '/',
     element: <Home />,
   },
   {
-    path: "/medium",
-    element: <Medium />,
-  },
-  {
-    path: "/complex",
+    path: '/complex',
     element: <Complex />,
   },
 ]);

@@ -1,81 +1,213 @@
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { atom } from 'jotai';
+import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { selectAtom } from 'jotai/utils';
 import { Plus } from 'lucide-react';
-import { 
-  BENCHMARK_DEBOUNCE_TIME,
+import {
   BENCHMARK_SIZE,
   BENCHMARK_TOGGLE_SIZE,
-  type Todo
+  evaluate,
+  shortId,
+  type Todo,
+  type TodosState,
 } from '@anchor-benchmark/shared';
 import { type FormEvent, memo, useEffect, useRef } from 'react';
 
-// Utility function to generate short IDs (similar to Anchor's shortId)
-const shortId = () => Math.random().toString(36).substring(2, 9);
-
 // Debug render function to visualize re-renders
-const debugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
-  if (ref.current) {
-    // Check if this is the first render or a re-render
-    if (!ref.current.hasAttribute('data-rendered')) {
-      // First render - red box shadow
-      ref.current.setAttribute('data-rendered', 'true');
-      ref.current.style.boxShadow = '0 0 0 2px red';
-      setTimeout(() => {
-        if (ref.current) {
-          ref.current.style.boxShadow = 'none';
-        }
-      }, 300);
-    } else {
-      // Re-render - blue box shadow
-      ref.current.style.boxShadow = '0 0 0 2px blue';
-      setTimeout(() => {
-        if (ref.current) {
-          ref.current.style.boxShadow = 'none';
-        }
-      }, 300);
+const useDebugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
+  useEffect(() => {
+    if (ref.current) {
+      // Check if this is the first render or a re-render
+      if (!ref.current.hasAttribute('data-rendered')) {
+        // First render - red box shadow
+        ref.current.setAttribute('data-rendered', 'true');
+        ref.current.style.boxShadow = '0 0 0 1px red';
+        setTimeout(() => {
+          if (ref.current) {
+            ref.current.style.boxShadow = 'none';
+          }
+        }, 300);
+      } else {
+        // Re-render - blue box shadow
+        ref.current.style.boxShadow = '0 0 0 1px blue';
+        setTimeout(() => {
+          if (ref.current) {
+            ref.current.style.boxShadow = 'none';
+          }
+        }, 300);
+      }
     }
-  }
+  });
 };
 
-// Counter atom
-const counterAtom = atom(0);
+// Define atoms for state management
+const todoStateAtom = atom<TodosState>({
+  items: [
+    {
+      id: '1',
+      title: 'Learn React state',
+      completed: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      priority: 'high',
+      tags: ['learning'],
+    },
+    {
+      id: '2',
+      title: 'Learn Jotai states',
+      completed: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      priority: 'high',
+      tags: ['learning', 'jotai'],
+    },
+    {
+      id: '3',
+      title: 'Master Jotai state',
+      completed: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      priority: 'medium',
+      tags: ['learning', 'jotai', 'mastery'],
+    },
+  ],
+  filter: 'all',
+  sortOrder: 'asc',
+  sortBy: 'createdAt',
+});
 
-// Todo items atom
-const todoItemsAtom = atom<Todo[]>([
-  {
-    id: '1',
-    title: 'Learn React state',
-    completed: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    priority: 'high',
-    tags: ['learning'],
-  },
-  {
-    id: '2',
-    title: 'Learn Jotai states',
-    completed: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    priority: 'high',
-    tags: ['learning', 'jotai'],
-  },
-  {
-    id: '3',
-    title: 'Master Jotai state',
-    completed: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    priority: 'medium',
-    tags: ['learning', 'jotai', 'mastery'],
-  },
-]);
-
-// Stats atom
 const todoStatsAtom = atom({
   total: 3,
   completed: 1,
   active: 2,
+});
+
+// Counter atom
+const counterAtom = atom({ count: 0 });
+
+// Atoms for derived state
+const filteredTodosAtom = atom((get) => {
+  const state = get(todoStateAtom);
+  const { items, filter } = state;
+
+  switch (filter) {
+    case 'active':
+      return items.filter((todo) => !todo.completed);
+    case 'completed':
+      return items.filter((todo) => todo.completed);
+    default:
+      return items;
+  }
+});
+
+const totalAtom = selectAtom(todoStatsAtom, (stats) => stats.total);
+const activeAtom = selectAtom(todoStatsAtom, (stats) => stats.active);
+const completedAtom = selectAtom(todoStatsAtom, (stats) => stats.completed);
+
+// Form title atom
+const newTitleAtom = atom('');
+
+// Atoms for actions
+const addTodoAtom = atom(null, (_, set, title: string) => {
+  const newTodo: Todo = {
+    id: shortId(),
+    title,
+    completed: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    priority: 'medium',
+    tags: [],
+  };
+
+  set(todoStateAtom, (prev) => ({
+    ...prev,
+    items: [...prev.items, newTodo],
+  }));
+
+  set(todoStatsAtom, (prev) => ({
+    total: prev.total + 1,
+    active: prev.active + 1,
+    completed: prev.completed,
+  }));
+});
+
+const addTodoBenchmarkAtom = atom(null, (get, set) => {
+  const state = get(todoStateAtom);
+
+  return evaluate(() => {
+    const newTodo: Todo = {
+      id: shortId(),
+      title: `New Todo (${state.items.length + 1})`,
+      completed: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      priority: 'medium',
+      tags: [],
+    };
+
+    set(todoStateAtom, (prev) => ({
+      ...prev,
+      items: [...prev.items, newTodo],
+    }));
+
+    set(todoStatsAtom, (prev) => ({
+      total: prev.total + 1,
+      active: prev.active + 1,
+      completed: prev.completed,
+    }));
+  }, BENCHMARK_SIZE);
+});
+
+const toggleTodoAtom = atom(null, (get, set, id: string) => {
+  const state = get(todoStateAtom);
+  const todoIndex = state.items.findIndex((todo) => todo.id === id);
+
+  if (todoIndex === -1) return;
+
+  const todo = state.items[todoIndex];
+  const newCompleted = !todo.completed;
+
+  const updatedItems = [...state.items];
+  updatedItems[todoIndex] = {
+    ...todo,
+    completed: newCompleted,
+    updatedAt: new Date(),
+  };
+
+  set(todoStateAtom, (prev) => ({
+    ...prev,
+    items: updatedItems,
+  }));
+
+  set(todoStatsAtom, (prev) => ({
+    total: prev.total,
+    active: newCompleted ? prev.active - 1 : prev.active + 1,
+    completed: newCompleted ? prev.completed + 1 : prev.completed - 1,
+  }));
+});
+
+const toggleTodoBenchmarkAtom = atom(null, (_, set, id: string) => {
+  return evaluate(() => {
+    set(toggleTodoAtom, id);
+  }, BENCHMARK_TOGGLE_SIZE);
+});
+
+const deleteTodoAtom = atom(null, (get, set, id: string) => {
+  const state = get(todoStateAtom);
+  const todo = state.items.find((item) => item.id === id);
+
+  if (!todo) return;
+
+  const updatedItems = state.items.filter((item) => item.id !== id);
+
+  set(todoStateAtom, (prev) => ({
+    ...prev,
+    items: updatedItems,
+  }));
+
+  set(todoStatsAtom, (prev) => ({
+    total: prev.total - 1,
+    active: todo.completed ? prev.active : prev.active - 1,
+    completed: todo.completed ? prev.completed - 1 : prev.completed,
+  }));
 });
 
 export default function Home() {
@@ -91,35 +223,29 @@ export default function Home() {
 
 const Counter = () => {
   const [counter, setCounter] = useAtom(counterAtom);
-  const ref = useRef<HTMLDivElement>(null);
-  
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
 
   return (
-    <div ref={ref} className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full mx-4">
+    <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full mx-4">
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Hello, World!</h1>
         <p className="text-gray-600 mb-8">Welcome to the Jotai Benchmark</p>
 
         <div className="bg-gray-50 rounded-xl p-6 mb-8">
           <h2 className="text-2xl font-semibold text-gray-700 mb-4">Counter</h2>
-          <div className="text-5xl font-bold text-indigo-600 mb-6">{counter}</div>
+          <div className="text-5xl font-bold text-indigo-600 mb-6">{counter.count}</div>
           <div className="flex justify-center space-x-4">
             <button
-              onClick={() => setCounter(prev => prev - 1)}
+              onClick={() => setCounter((prev) => ({ ...prev, count: prev.count - 1 }))}
               className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300">
               Decrement
             </button>
             <button
-              onClick={() => setCounter(0)}
+              onClick={() => setCounter((prev) => ({ ...prev, count: 0 }))}
               className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300">
               Reset
             </button>
             <button
-              onClick={() => setCounter(prev => prev + 1)}
+              onClick={() => setCounter((prev) => ({ ...prev, count: prev.count + 1 }))}
               className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300">
               Increment
             </button>
@@ -132,91 +258,26 @@ const Counter = () => {
   );
 };
 
-// Atoms for form
-const newTitleAtom = atom('');
-
 const TodoForm = () => {
-  const [newTitle, setNewTitle] = useAtom(newTitleAtom);
-  const setTodoItems = useSetAtom(todoItemsAtom);
-  const setTodoStats = useSetAtom(todoStatsAtom);
   const ref = useRef<HTMLFormElement>(null);
-  
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
 
-  const addTodo = (e: FormEvent) => {
+  const [newTitle, setNewTitle] = useAtom(newTitleAtom);
+  const addTodo = useSetAtom(addTodoAtom);
+  const addTodoBenchmark = useSetAtom(addTodoBenchmarkAtom);
+
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (newTitle.trim()) {
-      const newTodo: Todo = {
-        id: shortId(),
-        title: newTitle,
-        completed: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        priority: 'medium',
-        tags: [],
-      };
-
-      setTodoItems(prev => [...prev, newTodo]);
-      setTodoStats(prev => ({
-        total: prev.total + 1,
-        completed: prev.completed,
-        active: prev.active + 1,
-      }));
-
+      addTodo(newTitle);
       setNewTitle('');
     }
   };
 
-  const benchmarkAdd = () => {
-    const start = performance.now();
-    let count = 0;
-    
-    const addNext = () => {
-      if (count < BENCHMARK_SIZE) {
-        // Add one item
-        setTodoItems(prev => {
-          const newItems = [...prev];
-          newItems.push({
-            id: shortId(),
-            title: `New Todo (${newItems.length + 1})`,
-            completed: false,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            priority: 'medium',
-            tags: [],
-          });
-          return newItems;
-        });
-        
-        // Update stats
-        setTodoStats(prev => ({
-          total: prev.total + 1,
-          completed: prev.completed,
-          active: prev.active + 1,
-        }));
-        
-        count++;
-        
-        // Schedule next addition with debounce
-        setTimeout(addNext, BENCHMARK_DEBOUNCE_TIME);
-      } else {
-        // Log the time it took to complete the benchmark
-        const end = performance.now();
-        console.log(`Profiling done in ${end - start}ms.`);
-      }
-    };
-    
-    // Start the benchmark
-    addNext();
-  };
-
   return (
-    <form ref={ref} className="flex gap-3" onSubmit={addTodo}>
+    <form ref={ref} className="flex gap-3" onSubmit={handleSubmit}>
       <input
         type="text"
         value={newTitle}
@@ -232,7 +293,7 @@ const TodoForm = () => {
       </button>
       <button
         type="button"
-        onClick={benchmarkAdd}
+        onClick={() => addTodoBenchmark()}
         className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300">
         Benchmark
       </button>
@@ -240,129 +301,20 @@ const TodoForm = () => {
   );
 };
 
-const TodoItem = memo(({ item, index }: { item: Todo; index: number }) => {
-  const setTodoItems = useSetAtom(todoItemsAtom);
-  const setTodoStats = useSetAtom(todoStatsAtom);
+const TodoItem = memo(({ item }: { item: Todo }) => {
   const ref = useRef<HTMLLIElement>(null);
-  
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
+
+  const toggleTodo = useSetAtom(toggleTodoAtom);
+  const toggleTodoBenchmark = useSetAtom(toggleTodoBenchmarkAtom);
+  const deleteTodo = useSetAtom(deleteTodoAtom);
 
   const handleToggle = () => {
-    setTodoItems(prev => {
-      const newItems = [...prev];
-      newItems[index] = {
-        ...newItems[index],
-        completed: !newItems[index].completed,
-        updatedAt: new Date(),
-      };
-      return newItems;
-    });
-
-    setTodoStats(prev => {
-      if (item.completed) {
-        return {
-          total: prev.total,
-          completed: prev.completed - 1,
-          active: prev.active + 1,
-        };
-      } else {
-        return {
-          total: prev.total,
-          completed: prev.completed + 1,
-          active: prev.active - 1,
-        };
-      }
-    });
+    toggleTodo(item.id);
   };
 
   const handleDelete = () => {
-    setTodoItems(prev => {
-      const newItems = [...prev];
-      newItems.splice(index, 1);
-      return newItems;
-    });
-
-    setTodoStats(prev => {
-      if (item.completed) {
-        return {
-          total: prev.total - 1,
-          completed: prev.completed - 1,
-          active: prev.active,
-        };
-      } else {
-        return {
-          total: prev.total - 1,
-          completed: prev.completed,
-          active: prev.active - 1,
-        };
-      }
-    });
-  };
-
-  const toggleBenchmark = () => {
-    // Log the start time
-    const start = performance.now();
-    
-    // We need to simulate the exact same behavior as Anchor:
-    // Execute the toggle function BENCHMARK_TOGGLE_SIZE times, 
-    // with a debounce between each operation
-    let count = 0;
-    let currentItem = item;
-    
-    const toggleNext = () => {
-      if (count < BENCHMARK_TOGGLE_SIZE) {
-        // Update the item
-        setTodoItems(prev => {
-          const newItems = [...prev];
-          newItems[index] = {
-            ...newItems[index],
-            completed: !newItems[index].completed,
-            updatedAt: new Date(),
-          };
-          return newItems;
-        });
-        
-        // Update stats based on current item state
-        setTodoStats(prev => {
-          if (currentItem.completed) {
-            // Was completed, now becomes active
-            return {
-              total: prev.total,
-              completed: prev.completed - 1,
-              active: prev.active + 1,
-            };
-          } else {
-            // Was active, now becomes completed
-            return {
-              total: prev.total,
-              completed: prev.completed + 1,
-              active: prev.active - 1,
-            };
-          }
-        });
-        
-        // Update our local reference to current item state
-        currentItem = {
-          ...currentItem,
-          completed: !currentItem.completed,
-        };
-        
-        count++;
-        
-        // Schedule next toggle with debounce
-        setTimeout(toggleNext, BENCHMARK_DEBOUNCE_TIME);
-      } else {
-        // Log the time it took to complete the toggle benchmark
-        const end = performance.now();
-        console.log(`Toggle profiling done in ${end - start}ms.`);
-      }
-    };
-    
-    // Start the toggle benchmark
-    toggleNext();
+    deleteTodo(item.id);
   };
 
   return (
@@ -376,13 +328,12 @@ const TodoItem = memo(({ item, index }: { item: Todo; index: number }) => {
             <span className="border border-slate-300 w-4 h-4 inline-block cursor-pointer"></span>
           )}
         </label>
-        <span
-          className={`text-semibold text-sm ${item.completed ? 'line-through text-slate-500' : 'text-slate-300'}`}>
+        <span className={`text-semibold text-sm ${item.completed ? 'line-through text-slate-500' : 'text-slate-300'}`}>
           {item.title}
         </span>
       </div>
       <button
-        onClick={toggleBenchmark}
+        onClick={() => toggleTodoBenchmark(item.id)}
         className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">
         Toggle {BENCHMARK_TOGGLE_SIZE}x
       </button>
@@ -394,48 +345,44 @@ const TodoItem = memo(({ item, index }: { item: Todo; index: number }) => {
 });
 
 const TodoList = () => {
-  const todoItems = useAtomValue(todoItemsAtom); // Use todoItemsAtom directly instead of readOnlyTodoItemsAtom
   const ref = useRef<HTMLUListElement>(null);
-  
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
 
-  if (!todoItems.length) {
+  const todos = useAtomValue(filteredTodosAtom);
+
+  if (!todos.length) {
     return <p className="text-slate-400 text-sm flex items-center justify-center mt-4">No todos yet.</p>;
   }
 
   return (
     <ul ref={ref} className="mt-4 space-y-2">
-      {todoItems.map((todo, index) => (
-        <TodoItem key={todo.id} item={todo} index={index} />
+      {todos.map((todo) => (
+        <TodoItem key={todo.id} item={todo} />
       ))}
     </ul>
   );
 };
 
 const TodoStats = () => {
-  const stats = useAtomValue(todoStatsAtom);
   const ref = useRef<HTMLDivElement>(null);
-  
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
+
+  const total = useAtomValue(totalAtom);
+  const active = useAtomValue(activeAtom);
+  const completed = useAtomValue(completedAtom);
 
   return (
     <div ref={ref} className="flex items-center justify-between px-10 pb-4">
       <div className="flex flex-col items-center">
-        <span className="text-lg font-semibold text-slate-400">{stats.total}</span>
+        <span className="text-lg font-semibold text-slate-400">{total}</span>
         <span className="text-xs text-gray-500">Total</span>
       </div>
       <div className="flex flex-col items-center">
-        <span className="text-lg font-semibold text-blue-600">{stats.active}</span>
+        <span className="text-lg font-semibold text-blue-600">{active}</span>
         <span className="text-xs text-gray-500">Active</span>
       </div>
       <div className="flex flex-col items-center">
-        <span className="text-lg font-semibold text-green-600">{stats.completed}</span>
+        <span className="text-lg font-semibold text-green-600">{completed}</span>
         <span className="text-xs text-gray-500">Completed</span>
       </div>
     </div>
@@ -444,20 +391,20 @@ const TodoStats = () => {
 
 const TodoApp = () => {
   const ref = useRef<HTMLDivElement>(null);
-  
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
 
   return (
-    <div ref={ref} className="bg-slate-900 rounded-2xl shadow-xl max-w-md w-full mx-4">
-      <div className="p-4">
+    <div ref={ref} className="bg-slate-900 rounded-2xl shadow-xl max-w-md w-full mx-4 flex flex-col gap-4">
+      <div className="px-4 mt-4">
         <h3 className="font-semibold text-slate-200 flex-1 text-xl mb-10 text-center">Jotai Todo List</h3>
         <TodoForm />
+      </div>
+      <div className="px-4 max-h-[512px] overflow-y-auto">
         <TodoList />
       </div>
-      <TodoStats />
+      <div className="px-4">
+        <TodoStats />
+      </div>
       <p className="text-slate-500 text-xs text-center px-10 mb-4">
         Stats are computed during mutation to prevent extensive resource usage from filtering. This also to showcase the
         complexity level of the optimization.

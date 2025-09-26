@@ -1,209 +1,39 @@
-import { create } from 'zustand';
-import { useEffect, useRef } from 'react';
 import { Plus } from 'lucide-react';
-import { 
-  BENCHMARK_DEBOUNCE_TIME,
+import {
   BENCHMARK_SIZE,
   BENCHMARK_TOGGLE_SIZE,
-  type Todo
+  evaluate,
+  type Todo,
 } from '@anchor-benchmark/shared';
-
-// Utility function to generate short IDs (similar to Anchor's shortId)
-const shortId = () => Math.random().toString(36).substring(2, 9);
+import { type FormEvent, memo, useEffect, useRef, useState } from 'react';
+import { useTodoStore } from './useTodoStore';
 
 // Debug render function to visualize re-renders
-const debugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
-  if (ref.current) {
-    // Check if this is the first render or a re-render
-    if (!ref.current.hasAttribute('data-rendered')) {
-      // First render - red box shadow
-      ref.current.setAttribute('data-rendered', 'true');
-      ref.current.style.boxShadow = '0 0 0 2px red';
-      setTimeout(() => {
-        if (ref.current) {
-          ref.current.style.boxShadow = 'none';
-        }
-      }, 300);
-    } else {
-      // Re-render - blue box shadow
-      ref.current.style.boxShadow = '0 0 0 2px blue';
-      setTimeout(() => {
-        if (ref.current) {
-          ref.current.style.boxShadow = 'none';
-        }
-      }, 300);
+const useDebugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
+  useEffect(() => {
+    if (ref.current) {
+      // Check if this is the first render or a re-render
+      if (!ref.current.hasAttribute('data-rendered')) {
+        // First render - red box shadow
+        ref.current.setAttribute('data-rendered', 'true');
+        ref.current.style.boxShadow = '0 0 0 1px red';
+        setTimeout(() => {
+          if (ref.current) {
+            ref.current.style.boxShadow = 'none';
+          }
+        }, 300);
+      } else {
+        // Re-render - blue box shadow
+        ref.current.style.boxShadow = '0 0 0 1px blue';
+        setTimeout(() => {
+          if (ref.current) {
+            ref.current.style.boxShadow = 'none';
+          }
+        }, 300);
+      }
     }
-  }
+  });
 };
-
-// Counter store
-const useCounterStore = create<{
-  count: number;
-  increment: () => void;
-  decrement: () => void;
-  reset: () => void;
-}>((set) => ({
-  count: 0,
-  increment: () => set((state) => ({ count: state.count + 1 })),
-  decrement: () => set((state) => ({ count: state.count - 1 })),
-  reset: () => set({ count: 0 }),
-}));
-
-// Todo store
-const useTodoStore = create<{
-  items: Todo[];
-  newTitle: string;
-  setNewTitle: (title: string) => void;
-  addTodo: () => void;
-  removeTodo: (index: number) => void;
-  toggleTodo: (index: number) => void;
-  benchmarkAdd: () => void;
-  toggleBenchmark: (index: number) => void;
-}>((set, get) => ({
-  items: [
-    {
-      id: '1',
-      title: 'Learn React state',
-      completed: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      priority: 'high',
-      tags: ['learning'],
-    },
-    {
-      id: '2',
-      title: 'Learn Zustand states',
-      completed: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      priority: 'high',
-      tags: ['learning', 'zustand'],
-    },
-    {
-      id: '3',
-      title: 'Master Zustand state',
-      completed: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      priority: 'medium',
-      tags: ['learning', 'zustand', 'mastery'],
-    },
-  ],
-  newTitle: '',
-  setNewTitle: (title) => set({ newTitle: title }),
-  addTodo: () => {
-    const { newTitle, items } = get();
-    if (newTitle.trim()) {
-      const newTodo: Todo = {
-        id: shortId(),
-        title: newTitle,
-        completed: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        priority: 'medium',
-        tags: [],
-      };
-      
-      set({ 
-        items: [...items, newTodo],
-        newTitle: ''
-      });
-    }
-  },
-  removeTodo: (index) => {
-    const { items } = get();
-    const newItems = [...items];
-    newItems.splice(index, 1);
-    set({ items: newItems });
-  },
-  toggleTodo: (index) => {
-    const { items } = get();
-    const newItems = [...items];
-    newItems[index] = {
-      ...newItems[index],
-      completed: !newItems[index].completed,
-      updatedAt: new Date(),
-    };
-    set({ items: newItems });
-  },
-  benchmarkAdd: () => {
-    const start = performance.now();
-    let count = 0;
-    
-    const addNext = () => {
-      if (count < BENCHMARK_SIZE) {
-        const { items } = get();
-        const newTodo: Todo = {
-          id: shortId(),
-          title: `New Todo (${items.length + 1})`,
-          completed: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          priority: 'medium',
-          tags: [],
-        };
-        
-        set({ items: [...items, newTodo] });
-        count++;
-        
-        // Schedule next addition with debounce
-        setTimeout(addNext, BENCHMARK_DEBOUNCE_TIME);
-      } else {
-        // Log the time it took to complete the benchmark
-        const end = performance.now();
-        console.log(`Profiling done in ${end - start}ms.`);
-      }
-    };
-    
-    // Start the benchmark
-    addNext();
-  },
-  toggleBenchmark: (index) => {
-    // Log the start time
-    const start = performance.now();
-    
-    // We need to simulate the exact same behavior as Anchor:
-    // Execute the toggle function BENCHMARK_TOGGLE_SIZE times, 
-    // with a debounce between each operation
-    let count = 0;
-    let { items } = get();
-    let currentItem = items[index];
-    
-    const toggleNext = () => {
-      if (count < BENCHMARK_TOGGLE_SIZE) {
-        // Update the item
-        const newItems = [...items];
-        newItems[index] = {
-          ...newItems[index],
-          completed: !newItems[index].completed,
-          updatedAt: new Date(),
-        };
-        set({ items: newItems });
-        
-        // Update our local reference to current item state
-        currentItem = {
-          ...currentItem,
-          completed: !currentItem.completed,
-        };
-        
-        // Update items for next iteration
-        items = newItems;
-        
-        count++;
-        
-        // Schedule next toggle with debounce
-        setTimeout(toggleNext, BENCHMARK_DEBOUNCE_TIME);
-      } else {
-        // Log the time it took to complete the toggle benchmark
-        const end = performance.now();
-        console.log(`Toggle profiling done in ${end - start}ms.`);
-      }
-    };
-    
-    // Start the toggle benchmark
-    toggleNext();
-  }
-}));
 
 export default function Home() {
   return (
@@ -217,16 +47,13 @@ export default function Home() {
 }
 
 const Counter = () => {
-  const { count, increment, decrement, reset } = useCounterStore();
   const ref = useRef<HTMLDivElement>(null);
-  
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
+
+  const [count, setCount] = useState(0);
 
   return (
-    <div ref={ref} className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full mx-4">
+    <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full mx-4">
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Hello, World!</h1>
         <p className="text-gray-600 mb-8">Welcome to the Zustand Benchmark</p>
@@ -236,17 +63,17 @@ const Counter = () => {
           <div className="text-5xl font-bold text-indigo-600 mb-6">{count}</div>
           <div className="flex justify-center space-x-4">
             <button
-              onClick={decrement}
+              onClick={() => setCount((c) => c - 1)}
               className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300">
               Decrement
             </button>
             <button
-              onClick={reset}
+              onClick={() => setCount(0)}
               className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300">
               Reset
             </button>
             <button
-              onClick={increment}
+              onClick={() => setCount((c) => c + 1)}
               className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300">
               Increment
             </button>
@@ -261,20 +88,62 @@ const Counter = () => {
 
 const TodoApp = () => {
   const ref = useRef<HTMLDivElement>(null);
-  
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
+
+  // Todo state
+  const { todoState, todoStats, addTodo, toggleTodo, deleteTodo } = useTodoStore();
+  const { items: todos } = todoState;
+  const { total, active, completed } = todoStats;
+
+  // Keep a ref to the current todos state for accurate reads in batch operations
+  const todosRef = useRef(todos);
+  todosRef.current = todos;
+
+  // Form state
+  const [newTitle, setNewTitle] = useState('');
+
+  // Filtered todos (matching Anchor implementation)
+  const filteredTodos = todos;
+
+  const handleAddTodo = (e: FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (newTitle.trim()) {
+      addTodo(newTitle);
+      setNewTitle('');
+    }
+  };
+
+  const addTodoBenchmark = () => {
+    return evaluate(() => {
+      addTodo(`New Todo (${todosRef.current.length + 1})`);
+    }, BENCHMARK_SIZE);
+  };
+
+  const toggleTodoBenchmark = (id: string) => {
+    return evaluate(() => {
+      toggleTodo(id);
+    }, BENCHMARK_TOGGLE_SIZE);
+  };
 
   return (
-    <div ref={ref} className="bg-slate-900 rounded-2xl shadow-xl max-w-md w-full mx-4">
-      <div className="p-4">
+    <div ref={ref} className="bg-slate-900 rounded-2xl shadow-xl max-w-md w-full mx-4 flex flex-col gap-4">
+      <div className="px-4 mt-4">
         <h3 className="font-semibold text-slate-200 flex-1 text-xl mb-10 text-center">Zustand Todo List</h3>
-        <TodoForm />
-        <TodoList />
+        <TodoForm newTitle={newTitle} setNewTitle={setNewTitle} addTodo={handleAddTodo} addTodoBenchmark={addTodoBenchmark} />
       </div>
-      <TodoStats />
+      <div className="px-4 max-h-[512px] overflow-y-auto">
+        <TodoList
+          todos={filteredTodos}
+          toggleTodo={toggleTodo}
+          toggleTodoBenchmark={toggleTodoBenchmark}
+          deleteTodo={deleteTodo}
+        />
+      </div>
+      <div className="px-4">
+        <TodoStats stats={{ total, active, completed }} />
+      </div>
       <p className="text-slate-500 text-xs text-center px-10 mb-4">
         Stats are computed during mutation to prevent extensive resource usage from filtering. This also to showcase the
         complexity level of the optimization.
@@ -283,24 +152,22 @@ const TodoApp = () => {
   );
 };
 
-const TodoForm = () => {
-  const newTitle = useTodoStore((state) => state.newTitle);
-  const { setNewTitle, addTodo, benchmarkAdd } = useTodoStore();
+const TodoForm = ({
+  newTitle,
+  setNewTitle,
+  addTodo,
+  addTodoBenchmark,
+}: {
+  newTitle: string;
+  setNewTitle: (title: string) => void;
+  addTodo: (e: FormEvent) => void;
+  addTodoBenchmark: () => void;
+}) => {
   const ref = useRef<HTMLFormElement>(null);
-  
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
-
-  const handleAddTodo = (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    addTodo();
-  };
+  useDebugRender(ref);
 
   return (
-    <form ref={ref} className="flex gap-3" onSubmit={handleAddTodo}>
+    <form ref={ref} className="flex gap-3" onSubmit={addTodo}>
       <input
         type="text"
         value={newTitle}
@@ -316,7 +183,7 @@ const TodoForm = () => {
       </button>
       <button
         type="button"
-        onClick={benchmarkAdd}
+        onClick={addTodoBenchmark}
         className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300">
         Benchmark
       </button>
@@ -324,84 +191,96 @@ const TodoForm = () => {
   );
 };
 
-const TodoItem = ({ item, index }: { item: Todo; index: number }) => {
-  const { toggleTodo, removeTodo, toggleBenchmark } = useTodoStore();
-  const ref = useRef<HTMLLIElement>(null);
-  
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+const TodoItem = memo(
+  ({
+    item,
+    toggleTodo,
+    toggleTodoBenchmark,
+    deleteTodo,
+  }: {
+    item: Todo;
+    toggleTodo: (id: string) => void;
+    toggleTodoBenchmark: (id: string) => void;
+    deleteTodo: (id: string) => void;
+  }) => {
+    const ref = useRef<HTMLLIElement>(null);
+    useDebugRender(ref);
 
-  return (
-    <li ref={ref} className="flex items-center gap-2">
-      <div className="flex items-center flex-1 gap-3 bg-slate-800/70 p-2 rounded-md">
-        <label className="text-slate-300">
-          <input 
-            type="checkbox" 
-            checked={item.completed} 
-            onChange={() => toggleTodo(index)} 
-            className="sr-only" 
-          />
-          {item.completed ? (
-            <span className="text-green-500 cursor-pointer">✓</span>
-          ) : (
-            <span className="border border-slate-300 w-4 h-4 inline-block cursor-pointer"></span>
-          )}
-        </label>
-        <span
-          className={`text-semibold text-sm ${item.completed ? 'line-through text-slate-500' : 'text-slate-300'}`}>
-          {item.title}
-        </span>
-      </div>
-      <button
-        onClick={() => toggleBenchmark(index)}
-        className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">
-        Toggle {BENCHMARK_TOGGLE_SIZE}x
-      </button>
-      <button 
-        onClick={() => removeTodo(index)} 
-        className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">
-        Delete
-      </button>
-    </li>
-  );
-};
+    const handleToggle = () => {
+      toggleTodo(item.id);
+    };
 
-const TodoList = () => {
-  const todoItems = useTodoStore((state) => state.items);
+    const handleDelete = () => {
+      deleteTodo(item.id);
+    };
+
+    return (
+      <li ref={ref} className="flex items-center gap-2">
+        <div className="flex items-center flex-1 gap-3 bg-slate-800/70 p-2 rounded-md">
+          <label className="text-slate-300">
+            <input type="checkbox" checked={item.completed} onChange={handleToggle} className="sr-only" />
+            {item.completed ? (
+              <span className="text-green-500 cursor-pointer">✓</span>
+            ) : (
+              <span className="border border-slate-300 w-4 h-4 inline-block cursor-pointer"></span>
+            )}
+          </label>
+          <span
+            className={`text-semibold text-sm ${item.completed ? 'line-through text-slate-500' : 'text-slate-300'}`}>
+            {item.title}
+          </span>
+        </div>
+        <button
+          onClick={() => toggleTodoBenchmark(item.id)}
+          className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">
+          Toggle {BENCHMARK_TOGGLE_SIZE}x
+        </button>
+        <button onClick={handleDelete} className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">
+          Delete
+        </button>
+      </li>
+    );
+  }
+);
+
+const TodoList = ({
+  todos,
+  toggleTodo,
+  toggleTodoBenchmark,
+  deleteTodo,
+}: {
+  todos: Todo[];
+  toggleTodo: (id: string) => void;
+  toggleTodoBenchmark: (id: string) => void;
+  deleteTodo: (id: string) => void;
+}) => {
   const ref = useRef<HTMLUListElement>(null);
-  
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
 
-  if (!todoItems.length) {
+  if (!todos.length) {
     return <p className="text-slate-400 text-sm flex items-center justify-center mt-4">No todos yet.</p>;
   }
 
   return (
     <ul ref={ref} className="mt-4 space-y-2">
-      {todoItems.map((todo, index) => (
-        <TodoItem key={todo.id} item={todo} index={index} />
+      {todos.map((todo) => (
+        <TodoItem
+          key={todo.id}
+          item={todo}
+          toggleTodo={toggleTodo}
+          toggleTodoBenchmark={toggleTodoBenchmark}
+          deleteTodo={deleteTodo}
+        />
       ))}
     </ul>
   );
 };
 
-const TodoStats = () => {
-  const todoItems = useTodoStore((state) => state.items);
+const TodoStats = ({ stats }: { stats: { total: number; active: number; completed: number } }) => {
   const ref = useRef<HTMLDivElement>(null);
-  
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
 
-  const total = todoItems.length;
-  const completed = todoItems.filter(todo => todo.completed).length;
-  const active = total - completed;
+  const { total, active, completed } = stats;
 
   return (
     <div ref={ref} className="flex items-center justify-between px-10 pb-4">

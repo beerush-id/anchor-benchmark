@@ -1,117 +1,118 @@
-import { observable, action, makeObservable, computed } from 'mobx';
 import { observer } from 'mobx-react-lite';
+import { makeAutoObservable, observable, runInAction } from 'mobx';
 import { Plus } from 'lucide-react';
-import { 
-  BENCHMARK_DEBOUNCE_TIME,
+import {
   BENCHMARK_SIZE,
   BENCHMARK_TOGGLE_SIZE,
-  type Todo
+  evaluate,
+  shortId,
+  type Todo,
+  type TodosState,
 } from '@anchor-benchmark/shared';
-import { type FormEvent, useEffect, useRef, useState } from 'react';
-
-// Utility function to generate short IDs (similar to Anchor's shortId)
-const shortId = () => Math.random().toString(36).substring(2, 9);
+import { type FormEvent, useEffect, useRef } from 'react';
 
 // Debug render function to visualize re-renders
-const debugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
-  if (ref.current) {
-    // Check if this is the first render or a re-render
-    if (!ref.current.hasAttribute('data-rendered')) {
-      // First render - red box shadow
-      ref.current.setAttribute('data-rendered', 'true');
-      ref.current.style.boxShadow = '0 0 0 2px red';
-      setTimeout(() => {
-        if (ref.current) {
-          ref.current.style.boxShadow = 'none';
-        }
-      }, 300);
-    } else {
-      // Re-render - blue box shadow
-      ref.current.style.boxShadow = '0 0 0 2px blue';
-      setTimeout(() => {
-        if (ref.current) {
-          ref.current.style.boxShadow = 'none';
-        }
-      }, 300);
+const useDebugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
+  useEffect(() => {
+    if (ref.current) {
+      // Check if this is the first render or a re-render
+      if (!ref.current.hasAttribute('data-rendered')) {
+        // First render - red box shadow
+        ref.current.setAttribute('data-rendered', 'true');
+        ref.current.style.boxShadow = '0 0 0 2px red';
+        setTimeout(() => {
+          if (ref.current) {
+            ref.current.style.boxShadow = 'none';
+          }
+        }, 300);
+      } else {
+        // Re-render - blue box shadow
+        ref.current.style.boxShadow = '0 0 0 2px blue';
+        setTimeout(() => {
+          if (ref.current) {
+            ref.current.style.boxShadow = 'none';
+          }
+        }, 300);
+      }
     }
-  }
+  });
 };
 
-// MobX store for todo items and stats
+// MobX Store
 class TodoStore {
-  todos: Todo[] = [
-    {
-      id: '1',
-      title: 'Learn React state',
-      completed: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      priority: 'high',
-      tags: ['learning'],
-    },
-    {
-      id: '2',
-      title: 'Learn MobX states',
-      completed: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      priority: 'high',
-      tags: ['learning', 'mobx'],
-    },
-    {
-      id: '3',
-      title: 'Master MobX state',
+  todoState: TodosState;
+  todoStats: { total: number; completed: number; active: number };
+  newTitle = '';
+
+  constructor() {
+    this.todoState = observable({
+      items: [
+        {
+          id: '1',
+          title: 'Learn React state',
+          completed: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          priority: 'high',
+          tags: ['learning'],
+        },
+        {
+          id: '2',
+          title: 'Learn MobX states',
+          completed: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          priority: 'high',
+          tags: ['learning', 'mobx'],
+        },
+        {
+          id: '3',
+          title: 'Master MobX state',
+          completed: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          priority: 'medium',
+          tags: ['learning', 'mobx', 'mastery'],
+        },
+      ],
+      filter: 'all',
+      sortOrder: 'asc',
+      sortBy: 'createdAt',
+    });
+
+    this.todoStats = observable({
+      total: 3,
+      completed: 1,
+      active: 2,
+    });
+
+    makeAutoObservable(this);
+  }
+
+  // Actions
+  addTodo(title: string) {
+    const newTodo: Todo = {
+      id: shortId(),
+      title,
       completed: false,
       createdAt: new Date(),
       updatedAt: new Date(),
       priority: 'medium',
-      tags: ['learning', 'mobx', 'mastery'],
-    },
-  ];
+      tags: [],
+    };
 
-  newTitle = '';
+    this.todoState.items.push(newTodo);
 
-  constructor() {
-    makeObservable(this, {
-      todos: observable,
-      newTitle: observable,
-      addTodo: action,
-      removeTodo: action,
-      toggleTodo: action,
-      setNewTitle: action,
-      benchmarkAdd: action,
-      addBenchmarkItem: action,
-      toggleBenchmark: action,
-      total: computed,
-      completed: computed,
-      active: computed,
-    });
+    this.todoStats.total++;
+    this.todoStats.active++;
+    this.newTitle = '';
   }
 
-  get total() {
-    return this.todos.length;
-  }
-
-  get completed() {
-    return this.todos.filter(todo => todo.completed).length;
-  }
-
-  get active() {
-    return this.total - this.completed;
-  }
-
-  setNewTitle(title: string) {
-    this.newTitle = title;
-  }
-
-  addTodo(e: FormEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (this.newTitle.trim()) {
+  addTodoBenchmark() {
+    return evaluate(() => {
       const newTodo: Todo = {
         id: shortId(),
-        title: this.newTitle,
+        title: `New Todo (${this.todoState.items.length + 1})`,
         completed: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -119,142 +120,122 @@ class TodoStore {
         tags: [],
       };
 
-      this.todos.push(newTodo);
-      this.newTitle = '';
+      runInAction(() => {
+        this.todoState.items.push(newTodo);
+        this.todoStats.total++;
+        this.todoStats.active++;
+      });
+    }, BENCHMARK_SIZE);
+  }
+
+  toggleTodo(id: string) {
+    const todo = this.todoState.items.find((item) => item.id === id);
+    if (!todo) return;
+
+    todo.completed = !todo.completed;
+    todo.updatedAt = new Date();
+
+    if (todo.completed) {
+      this.todoStats.completed++;
+      this.todoStats.active--;
+    } else {
+      this.todoStats.completed--;
+      this.todoStats.active++;
     }
   }
 
-  removeTodo(index: number) {
-    this.todos.splice(index, 1);
+  toggleTodoBenchmark(id: string) {
+    return evaluate(() => {
+      runInAction(() => {
+        this.toggleTodo(id);
+      });
+    }, BENCHMARK_TOGGLE_SIZE);
   }
 
-  toggleTodo(index: number) {
-    const todo = this.todos[index];
-    // Create a new object with updated properties
-    this.todos[index] = {
-      ...todo,
-      completed: !todo.completed,
-      updatedAt: new Date(),
-    };
+  deleteTodo(id: string) {
+    const todoIndex = this.todoState.items.findIndex((item) => item.id === id);
+    if (todoIndex === -1) return;
+
+    const todo = this.todoState.items[todoIndex];
+    this.todoState.items.splice(todoIndex, 1);
+
+    if (todo.completed) {
+      this.todoStats.completed--;
+    } else {
+      this.todoStats.active--;
+    }
+
+    this.todoStats.total--;
   }
 
-  benchmarkAdd() {
-    const start = performance.now();
-    let count = 0;
-    
-    const addNext = () => {
-      if (count < BENCHMARK_SIZE) {
-        // Add one item using an action
-        this.addBenchmarkItem();
-        count++;
-        
-        // Schedule next addition with debounce
-        setTimeout(addNext, BENCHMARK_DEBOUNCE_TIME);
-      } else {
-        // Log the time it took to complete the benchmark
-        const end = performance.now();
-        console.log(`Profiling done in ${end - start}ms.`);
-      }
-    };
-    
-    // Start the benchmark
-    addNext();
+  setNewTitle(title: string) {
+    this.newTitle = title;
   }
 
-  addBenchmarkItem() {
-    const newTodo: Todo = {
-      id: shortId(),
-      title: `New Todo (${this.todos.length + 1})`,
-      completed: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      priority: 'medium',
-      tags: [],
-    };
-    
-    this.todos.push(newTodo);
+  get filteredTodos() {
+    switch (this.todoState.filter) {
+      case 'active':
+        return this.todoState.items.filter((todo) => !todo.completed);
+      case 'completed':
+        return this.todoState.items.filter((todo) => todo.completed);
+      default:
+        return this.todoState.items;
+    }
   }
 
-  toggleBenchmark(index: number) {
-    // Log the start time
-    const start = performance.now();
-    
-    // We need to simulate the exact same behavior as Anchor:
-    // Execute the toggle function BENCHMARK_TOGGLE_SIZE times, 
-    // with a debounce between each operation
-    let count = 0;
-    
-    const toggleNext = () => {
-      if (count < BENCHMARK_TOGGLE_SIZE) {
-        // Toggle the item using an action
-        this.toggleTodo(index);
-        
-        count++;
-        
-        // Schedule next toggle with debounce
-        setTimeout(toggleNext, BENCHMARK_DEBOUNCE_TIME);
-      } else {
-        // Log the time it took to complete the toggle benchmark
-        const end = performance.now();
-        console.log(`Toggle profiling done in ${end - start}ms.`);
-      }
-    };
-    
-    // Start the toggle benchmark
-    toggleNext();
+  get total() {
+    return this.todoStats.total;
+  }
+
+  get active() {
+    return this.todoStats.active;
+  }
+
+  get completed() {
+    return this.todoStats.completed;
   }
 }
+
+// Create store instance
+const todoStore = new TodoStore();
 
 // Counter store
 class CounterStore {
   count = 0;
 
   constructor() {
-    makeObservable(this, {
-      count: observable,
-      increment: action,
-      decrement: action,
-      reset: action,
-    });
+    makeAutoObservable(this);
   }
 
-  increment = () => {
-    this.count += 1;
-  };
+  increment() {
+    this.count++;
+  }
 
-  decrement = () => {
-    this.count -= 1;
-  };
+  decrement() {
+    this.count--;
+  }
 
-  reset = () => {
+  reset() {
     this.count = 0;
-  };
+  }
 }
 
-const HomeContent = observer(() => {
-  const [todoStore] = useState(() => new TodoStore());
-  const [counterStore] = useState(() => new CounterStore());
+const counterStore = new CounterStore();
 
+export default function Home() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="flex flex-col lg:flex-row gap-6 w-full max-w-6xl justify-center">
-        <Counter counterStore={counterStore} />
-        <TodoApp todoStore={todoStore} />
+        <Counter />
+        <TodoApp />
       </div>
     </div>
   );
-});
+}
 
-const Counter = observer(({ counterStore }: { counterStore: CounterStore }) => {
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
-
+const Counter = observer(() => {
   return (
-    <div ref={ref} className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full mx-4">
+    <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full mx-4">
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Hello, World!</h1>
         <p className="text-gray-600 mb-8">Welcome to the MobX Benchmark</p>
@@ -264,17 +245,17 @@ const Counter = observer(({ counterStore }: { counterStore: CounterStore }) => {
           <div className="text-5xl font-bold text-indigo-600 mb-6">{counterStore.count}</div>
           <div className="flex justify-center space-x-4">
             <button
-              onClick={counterStore.decrement}
+              onClick={() => counterStore.decrement()}
               className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300">
               Decrement
             </button>
             <button
-              onClick={counterStore.reset}
+              onClick={() => counterStore.reset()}
               className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300">
               Reset
             </button>
             <button
-              onClick={counterStore.increment}
+              onClick={() => counterStore.increment()}
               className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300">
               Increment
             </button>
@@ -287,40 +268,21 @@ const Counter = observer(({ counterStore }: { counterStore: CounterStore }) => {
   );
 });
 
-const TodoApp = observer(({ todoStore }: { todoStore: TodoStore }) => {
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
-
-  return (
-    <div ref={ref} className="bg-slate-900 rounded-2xl shadow-xl max-w-md w-full mx-4">
-      <div className="p-4">
-        <h3 className="font-semibold text-slate-200 flex-1 text-xl mb-10 text-center">MobX Todo List</h3>
-        <TodoForm todoStore={todoStore} />
-        <TodoList todoStore={todoStore} />
-      </div>
-      <TodoStats todoStore={todoStore} />
-      <p className="text-slate-500 text-xs text-center px-10 mb-4">
-        Stats are computed during mutation to prevent extensive resource usage from filtering. This also to showcase the
-        complexity level of the optimization.
-      </p>
-    </div>
-  );
-});
-
-const TodoForm = observer(({ todoStore }: { todoStore: TodoStore }) => {
+const TodoForm = observer(() => {
   const ref = useRef<HTMLFormElement>(null);
+  useDebugRender(ref);
 
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (todoStore.newTitle.trim()) {
+      todoStore.addTodo(todoStore.newTitle);
+    }
+  };
 
   return (
-    <form ref={ref} className="flex gap-3" onSubmit={(e) => todoStore.addTodo(e)}>
+    <form ref={ref} className="flex gap-3" onSubmit={handleSubmit}>
       <input
         type="text"
         value={todoStore.newTitle}
@@ -336,7 +298,7 @@ const TodoForm = observer(({ todoStore }: { todoStore: TodoStore }) => {
       </button>
       <button
         type="button"
-        onClick={() => todoStore.benchmarkAdd()}
+        onClick={() => todoStore.addTodoBenchmark()}
         className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300">
         Benchmark
       </button>
@@ -344,76 +306,65 @@ const TodoForm = observer(({ todoStore }: { todoStore: TodoStore }) => {
   );
 });
 
-const TodoItem = observer(({ todo, index, todoStore }: { todo: Todo; index: number; todoStore: TodoStore }) => {
+const TodoItem = observer(({ item }: { item: Todo }) => {
   const ref = useRef<HTMLLIElement>(null);
+  useDebugRender(ref);
 
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const handleToggle = () => {
+    todoStore.toggleTodo(item.id);
+  };
+
+  const handleDelete = () => {
+    todoStore.deleteTodo(item.id);
+  };
 
   return (
     <li ref={ref} className="flex items-center gap-2">
       <div className="flex items-center flex-1 gap-3 bg-slate-800/70 p-2 rounded-md">
         <label className="text-slate-300">
-          <input
-            type="checkbox"
-            checked={todo.completed}
-            onChange={() => todoStore.toggleTodo(index)}
-            className="sr-only"
-          />
-          {todo.completed ? (
+          <input type="checkbox" checked={item.completed} onChange={handleToggle} className="sr-only" />
+          {item.completed ? (
             <span className="text-green-500 cursor-pointer">✓</span>
           ) : (
             <span className="border border-slate-300 w-4 h-4 inline-block cursor-pointer"></span>
           )}
         </label>
-        <span className={`text-semibold text-sm ${todo.completed ? 'line-through text-slate-500' : 'text-slate-300'}`}>
-          {todo.title}
+        <span className={`text-semibold text-sm ${item.completed ? 'line-through text-slate-500' : 'text-slate-300'}`}>
+          {item.title}
         </span>
       </div>
       <button
-        onClick={() => todoStore.toggleBenchmark(index)}
+        onClick={() => todoStore.toggleTodoBenchmark(item.id)}
         className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">
         Toggle {BENCHMARK_TOGGLE_SIZE}x
       </button>
-      <button
-        onClick={() => todoStore.removeTodo(index)}
-        className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">
+      <button onClick={handleDelete} className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">
         Delete
       </button>
     </li>
   );
 });
 
-const TodoList = observer(({ todoStore }: { todoStore: TodoStore }) => {
+const TodoList = observer(() => {
   const ref = useRef<HTMLUListElement>(null);
+  useDebugRender(ref);
 
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
-
-  if (!todoStore.todos.length) {
+  if (!todoStore.filteredTodos.length) {
     return <p className="text-slate-400 text-sm flex items-center justify-center mt-4">No todos yet.</p>;
   }
 
   return (
     <ul ref={ref} className="mt-4 space-y-2">
-      {todoStore.todos.map((todo, index) => (
-        <TodoItem key={todo.id} todo={todo} index={index} todoStore={todoStore} />
+      {todoStore.filteredTodos.map((todo) => (
+        <TodoItem key={todo.id} item={todo} />
       ))}
     </ul>
   );
 });
 
-const TodoStats = observer(({ todoStore }: { todoStore: TodoStore }) => {
+const TodoStats = observer(() => {
   const ref = useRef<HTMLDivElement>(null);
-
-  // Apply debug render visualization
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
 
   return (
     <div ref={ref} className="flex items-center justify-between px-10 pb-4">
@@ -433,6 +384,26 @@ const TodoStats = observer(({ todoStore }: { todoStore: TodoStore }) => {
   );
 });
 
-export default function Home() {
-  return <HomeContent />;
-}
+const TodoApp = observer(() => {
+  const ref = useRef<HTMLDivElement>(null);
+  useDebugRender(ref);
+
+  return (
+    <div ref={ref} className="bg-slate-900 rounded-2xl shadow-xl max-w-md w-full mx-4 flex flex-col gap-4">
+      <div className="px-4 mt-4">
+        <h3 className="font-semibold text-slate-200 flex-1 text-xl mb-10 text-center">MobX Todo List</h3>
+        <TodoForm />
+      </div>
+      <div className="px-4 max-h-[512px] overflow-y-auto">
+        <TodoList />
+      </div>
+      <div className="px-4">
+        <TodoStats />
+      </div>
+      <p className="text-slate-500 text-xs text-center px-10 mb-4">
+        Stats are computed during mutation to prevent extensive resource usage from filtering. This also to showcase the
+        complexity level of the optimization.
+      </p>
+    </div>
+  );
+});
