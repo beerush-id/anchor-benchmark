@@ -1,84 +1,73 @@
-import { Eye, MessageSquare, Heart, Trash2, BarChart2, Folder, Tag, User, Calendar, Hash, Reply } from 'lucide-react';
+import { BarChart2, Calendar, Eye, Folder, Hash, Heart, MessageSquare, Reply, Tag, Trash2, User } from 'lucide-react';
 import {
   BENCHMARK_SIZE,
   BENCHMARK_TOGGLE_SIZE,
-  type Post,
   type Category,
-  type Tag as TagType,
   type ComplexState,
   evaluate,
+  type Post,
+  shortId,
+  type Tag as TagType,
 } from '@anchor-benchmark/shared';
-import { useSelector, useDispatch } from 'react-redux';
 import { memo, useEffect, useRef } from 'react';
-import RAWJson from './dummyContent.json';
+import dummyData from '@anchor-benchmark/shared/data/dummy-data.json';
+import { useAppDispatch, useAppSelector } from './store';
 import {
-  addPost,
-  removePost,
-  incrementPostViews,
-  addPostLike,
-  addPostComment,
+  addCategories,
   addCommentLike,
   addCommentReply,
+  addPostComment,
+  addPostLike,
+  addPosts,
   addReplyLike,
-  addCategory,
-  removeCategory,
-  addTag,
-  removeTag,
-} from './complexSlice.js';
-import type { RootState, AppDispatch } from './store.js';
+  addTags,
+  deleteCategory,
+  deletePost,
+  deleteTag,
+  incrementPostViews,
+} from './complexSlice';
 
 // Add typings to the dummy data.
-const dummyContent = RAWJson as unknown as ComplexState;
-
-// Utility function to generate short IDs (similar to Anchor's shortId)
-const shortId = () => Math.random().toString(36).substring(2, 9);
+const dummyContent = dummyData as unknown as ComplexState;
 
 // Debug render function to visualize re-renders
-const debugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
-  if (ref.current) {
-    // Check if this is the first render or a re-render
-    if (!ref.current.hasAttribute('data-rendered')) {
-      // First render - red box shadow
-      ref.current.setAttribute('data-rendered', 'true');
-      ref.current.style.boxShadow = '0 0 0 2px red';
-      setTimeout(() => {
-        if (ref.current) {
-          ref.current.style.boxShadow = 'none';
-        }
-      }, 300);
-    } else {
-      // Re-render - blue box shadow
-      ref.current.style.boxShadow = '0 0 0 2px blue';
-      setTimeout(() => {
-        if (ref.current) {
-          ref.current.style.boxShadow = 'none';
-        }
-      }, 300);
+const useDebugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
+  useEffect(() => {
+    if (ref.current) {
+      // Check if this is the first render or a re-render
+      if (!ref.current.hasAttribute('data-rendered')) {
+        // First render - red box shadow
+        ref.current.setAttribute('data-rendered', 'true');
+        ref.current.style.boxShadow = '0 0 0 1px red';
+        setTimeout(() => {
+          if (ref.current) {
+            ref.current.style.boxShadow = 'none';
+          }
+        }, 300);
+      } else {
+        // Re-render - blue box shadow
+        ref.current.style.boxShadow = '0 0 0 1px blue';
+        setTimeout(() => {
+          if (ref.current) {
+            ref.current.style.boxShadow = 'none';
+          }
+        }, 300);
+      }
     }
-  }
+  });
 };
 
-// Benchmark functions
-const useBenchmark = () => {
-  const dispatch: AppDispatch = useDispatch();
+const benchmark = (fn: () => void) => {
+  return evaluate(fn, BENCHMARK_SIZE);
+};
 
-  const benchmark = (fn: () => void) => {
-    return evaluate(fn, BENCHMARK_SIZE);
-  };
-
-  const toggleBenchmark = (fn: () => void) => {
-    return evaluate(fn, BENCHMARK_TOGGLE_SIZE);
-  };
-
-  return { benchmark, toggleBenchmark, dispatch };
+const toggleBenchmark = (fn: () => void) => {
+  return evaluate(fn, BENCHMARK_TOGGLE_SIZE);
 };
 
 export default function Complex() {
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 sm:p-6">
@@ -102,17 +91,19 @@ export default function Complex() {
   );
 }
 
-const PostsSection = memo(() => {
+const PostsSection = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const { benchmark, dispatch } = useBenchmark();
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const dispatch = useAppDispatch();
 
-  const addPosts = () => {
+  const addPostsHandler = () => {
     benchmark(() => {
-      dispatch(addPost(structuredClone({ ...dummyContent.posts[0], id: shortId() }) as never));
+      const newPosts = Array.from({ length: 1 }, () => ({
+        ...structuredClone(dummyContent.posts[0]),
+        id: shortId(),
+      }));
+      dispatch(addPosts(newPosts));
     });
   };
 
@@ -125,7 +116,7 @@ const PostsSection = memo(() => {
         <h2 className="font-semibold text-gray-800 text-xl">Posts</h2>
         <span className="flex-1"></span>
         <button
-          onClick={addPosts}
+          onClick={addPostsHandler}
           className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 flex items-center justify-center gap-2">
           <BarChart2 size={16} />
           Add {BENCHMARK_SIZE.toLocaleString()} Posts
@@ -134,15 +125,13 @@ const PostsSection = memo(() => {
       <PostList />
     </div>
   );
-});
+};
 
-const PostList = memo(() => {
+const PostList = () => {
   const ref = useRef<HTMLUListElement>(null);
-  const posts = useSelector((state: RootState) => state.complex.posts);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const posts = useAppSelector((state) => state.complex.posts);
 
   if (!posts.length) {
     return <p className="text-gray-500 text-center py-4">No posts yet.</p>;
@@ -150,51 +139,43 @@ const PostList = memo(() => {
 
   return (
     <ul ref={ref} className="mt-2">
-      {posts.map((post, index) => (
-        <PostItem key={post.id} item={post as never} index={index} />
+      {posts.map((post) => (
+        <PostItem key={post.id} item={post} />
       ))}
     </ul>
   );
-});
+};
 
-const PostItem = memo(({ item, index }: { item: Post; index: number }) => {
+const PostItem = memo(({ item }: { item: Post }) => {
   const ref = useRef<HTMLLIElement>(null);
-  const { toggleBenchmark, dispatch } = useBenchmark();
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const dispatch = useAppDispatch();
 
   const incrementViews = () => {
-    dispatch(incrementPostViews(index));
+    dispatch(incrementPostViews(item.id));
   };
 
   const addLike = () => {
-    dispatch(addPostLike(index));
+    dispatch(addPostLike({ postId: item.id, likeId: shortId() }));
   };
 
   const addComment = () => {
     dispatch(
       addPostComment({
-        index,
-        comment: {
-          ...structuredClone(dummyContent.posts[0].comments[0]),
-          id: shortId(),
-        } as never,
+        postId: item.id,
+        comment: { ...structuredClone(dummyContent.posts[0].comments[0]), id: shortId() },
       })
     );
   };
 
-  const deletePost = () => {
-    dispatch(removePost(index));
+  const deletePostHandler = () => {
+    dispatch(deletePost(item.id));
   };
 
-  const PostStats = memo(() => {
+  const PostStats = () => {
     const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      debugRender(ref);
-    });
+    useDebugRender(ref);
 
     return (
       <div ref={ref} className="flex flex-wrap gap-2 mb-3">
@@ -210,14 +191,11 @@ const PostItem = memo(({ item, index }: { item: Post; index: number }) => {
         <span className="font-medium text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded-full">{item.status}</span>
       </div>
     );
-  });
+  };
 
-  const PostInfo = memo(() => {
+  const PostInfo = () => {
     const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      debugRender(ref);
-    });
+    useDebugRender(ref);
 
     return (
       <div ref={ref} className="flex flex-col bg-gray-50 p-4 rounded-lg">
@@ -243,23 +221,21 @@ const PostItem = memo(({ item, index }: { item: Post; index: number }) => {
         <div className="mt-4 text-gray-700">{item.content.substring(0, 300)}...</div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {item.tags.map((tag, tagIndex) => (
-            <span key={tagIndex} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+          {item.tags.map((tag, index) => (
+            <span key={index} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
               #{tag}
             </span>
           ))}
         </div>
       </div>
     );
-  });
+  };
 
-  const PostComments = memo(() => {
+  const PostComments = () => {
     const ref = useRef<HTMLDivElement>(null);
-    const displayedComments = item.comments.slice(0, 5);
+    useDebugRender(ref);
 
-    useEffect(() => {
-      debugRender(ref);
-    });
+    const displayedComments = item.comments.slice(0, 5);
 
     return (
       <>
@@ -270,16 +246,13 @@ const PostItem = memo(({ item, index }: { item: Post; index: number }) => {
               Comments ({item.comments.length.toLocaleString()})
             </h4>
             {displayedComments.map(
-              (comment, commentIndex) =>
-                commentIndex < 5 && (
-                  <CommentItem key={comment.id} comment={comment} postIndex={index} commentIndex={commentIndex} />
-                )
+              (comment, index) => index < 5 && <CommentItem key={comment.id} comment={comment} postId={item.id} />
             )}
           </div>
         )}
       </>
     );
-  });
+  };
 
   return (
     <li ref={ref} className="mb-6 last:mb-0">
@@ -304,7 +277,7 @@ const PostItem = memo(({ item, index }: { item: Post; index: number }) => {
           Comment ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
         </button>
         <button
-          onClick={deletePost}
+          onClick={deletePostHandler}
           className="px-3 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-1">
           <Trash2 size={16} />
         </button>
@@ -314,158 +287,125 @@ const PostItem = memo(({ item, index }: { item: Post; index: number }) => {
   );
 });
 
-const CommentItem = memo(
-  ({
-    comment,
-    postIndex,
-    commentIndex,
-  }: {
-    comment: Post['comments'][number];
-    postIndex: number;
-    commentIndex: number;
-  }) => {
+const CommentItem = memo(({ comment, postId }: { comment: Post['comments'][number]; postId: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  useDebugRender(ref);
+
+  const dispatch = useAppDispatch();
+
+  const addLike = () => {
+    dispatch(addCommentLike({ postId, commentId: comment.id, likeId: shortId() }));
+  };
+
+  const addReply = () => {
+    dispatch(
+      addCommentReply({
+        postId,
+        commentId: comment.id,
+        reply: { ...structuredClone(dummyContent.posts[0].comments[0]), id: shortId() },
+      })
+    );
+  };
+
+  const deleteComment = () => {
+    console.log('Delete comment', comment.id);
+  };
+
+  const CommentStats = () => {
     const ref = useRef<HTMLDivElement>(null);
-    const { toggleBenchmark, dispatch } = useBenchmark();
-
-    useEffect(() => {
-      debugRender(ref);
-    });
-
-    const addLike = () => {
-      dispatch(addCommentLike({ postIndex, commentIndex }));
-    };
-
-    const addReply = () => {
-      dispatch(
-        addCommentReply({
-          postIndex,
-          commentIndex,
-          reply: {
-            ...structuredClone(dummyContent.posts[0].comments[0]),
-            id: shortId(),
-          } as never,
-        })
-      );
-    };
-
-    const deleteComment = () => {
-      console.log('Delete comment', comment.id);
-    };
-
-    const CommentStats = memo(() => {
-      const ref = useRef<HTMLDivElement>(null);
-
-      useEffect(() => {
-        debugRender(ref);
-      });
-
-      return (
-        <div ref={ref} className="flex gap-4 items-center">
-          <button onClick={() => toggleBenchmark(addLike)} className="flex items-center gap-1 hover:text-red-500">
-            <span className="flex items-center gap-1 bg-slate-200 rounded-sm px-1 py-0.5 font-medium text-xs">
-              <Heart size={14} />
-              <span>{comment.likes.length.toLocaleString()}</span>
-            </span>
-            <span className="font-medium">Like ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)</span>
-          </button>
-          <button onClick={() => toggleBenchmark(addReply)} className="flex items-center gap-1 hover:text-blue-500">
-            <span className="flex items-center gap-1 bg-slate-200 rounded-sm px-1 py-0.5 font-medium text-xs">
-              <Reply size={14} />
-              <span>{comment.replies.length.toLocaleString()}</span>
-            </span>
-            <span className="font-medium">Reply ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)</span>
-          </button>
-        </div>
-      );
-    });
-
-    const CommentReplies = memo(() => {
-      const ref = useRef<HTMLDivElement>(null);
-      const replies = comment.replies.slice(0, 3);
-
-      useEffect(() => {
-        debugRender(ref);
-      });
-
-      return (
-        <>
-          {replies.length > 0 && (
-            <div className="mt-3 ml-2 pl-3 border-l-2 border-gray-300">
-              <h5 className="text-xs font-semibold text-gray-600 mb-2">Replies ({replies.length.toLocaleString()})</h5>
-              <div className="space-y-3">
-                {replies.map((reply, replyIndex) => (
-                  <ReplyItem
-                    key={reply.id}
-                    reply={reply}
-                    postIndex={postIndex}
-                    commentIndex={commentIndex}
-                    replyIndex={replyIndex}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      );
-    });
+    useDebugRender(ref);
 
     return (
-      <div ref={ref} className="bg-gray-100 p-3 rounded-lg">
-        <div className="flex items-start gap-3">
-          <div className="bg-gray-200 border-2 border-dashed rounded-xl w-10 h-10 flex-shrink-0" />
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-semibold text-gray-800 text-sm">{comment.author.username}</span>
-              <span className="text-xs text-gray-500">{new Date(comment.createdAt).toLocaleDateString()}</span>
-            </div>
-            <p className="text-gray-700 text-sm mb-2">{comment.content}</p>
-            <div className="flex items-center gap-3 text-xs text-gray-600">
-              <CommentStats />
-              <button onClick={deleteComment} className="flex items-center gap-1 hover:text-gray-800">
-                <Trash2 size={14} />
-              </button>
-            </div>
-          </div>
-        </div>
-        <CommentReplies />
+      <div ref={ref} className="flex gap-4 items-center">
+        <button onClick={() => toggleBenchmark(addLike)} className="flex items-center gap-1 hover:text-red-500">
+          <span className="flex items-center gap-1 bg-slate-200 rounded-sm px-1 py-0.5 font-medium text-xs">
+            <Heart size={14} />
+            <span>{comment.likes.length.toLocaleString()}</span>
+          </span>
+          <span className="font-medium">Like ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)</span>
+        </button>
+        <button onClick={() => toggleBenchmark(addReply)} className="flex items-center gap-1 hover:text-blue-500">
+          <span className="flex items-center gap-1 bg-slate-200 rounded-sm px-1 py-0.5 font-medium text-xs">
+            <Reply size={14} />
+            <span>{comment.replies.length.toLocaleString()}</span>
+          </span>
+          <span className="font-medium">Reply ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)</span>
+        </button>
       </div>
     );
-  }
-);
+  };
+
+  const CommentReplies = () => {
+    const ref = useRef<HTMLDivElement>(null);
+    useDebugRender(ref);
+
+    const replies = comment.replies.slice(0, 3);
+
+    return (
+      <>
+        {replies.length > 0 && (
+          <div className="mt-3 ml-2 pl-3 border-l-2 border-gray-300">
+            <h5 className="text-xs font-semibold text-gray-600 mb-2">Replies ({replies.length.toLocaleString()})</h5>
+            <div className="space-y-3">
+              {replies.map((reply) => (
+                <ReplyItem key={reply.id} reply={reply} postId={postId} commentId={comment.id} />
+              ))}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  return (
+    <div ref={ref} className="bg-gray-100 p-3 rounded-lg">
+      <div className="flex items-start gap-3">
+        <div className="bg-gray-200 border-2 border-dashed rounded-xl w-10 h-10 flex-shrink-0" />
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-semibold text-gray-800 text-sm">{comment.author.username}</span>
+            <span className="text-xs text-gray-500">{new Date(comment.createdAt).toLocaleDateString()}</span>
+          </div>
+          <p className="text-gray-700 text-sm mb-2">{comment.content}</p>
+          <div className="flex items-center gap-3 text-xs text-gray-600">
+            <CommentStats />
+            <button onClick={deleteComment} className="flex items-center gap-1 hover:text-gray-800">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+      <CommentReplies />
+    </div>
+  );
+});
 
 const ReplyItem = memo(
   ({
     reply,
-    postIndex,
-    commentIndex,
-    replyIndex,
+    postId,
+    commentId,
   }: {
     reply: Post['comments'][number]['replies'][number];
-    postIndex: number;
-    commentIndex: number;
-    replyIndex: number;
+    postId: string;
+    commentId: string;
   }) => {
     const ref = useRef<HTMLDivElement>(null);
-    const { toggleBenchmark, dispatch } = useBenchmark();
+    useDebugRender(ref);
 
-    useEffect(() => {
-      debugRender(ref);
-    });
+    const dispatch = useAppDispatch();
 
     const addLike = () => {
-      dispatch(addReplyLike({ postIndex, commentIndex, replyIndex }));
+      dispatch(addReplyLike({ postId, commentId, replyId: reply.id, likeId: shortId() }));
     };
 
     const deleteReply = () => {
       console.log('Delete reply', reply.id);
     };
 
-    const LikesCount = memo(() => {
+    const LikesCount = () => {
       const ref = useRef<HTMLButtonElement>(null);
-
-      useEffect(() => {
-        debugRender(ref);
-      });
+      useDebugRender(ref);
 
       return (
         <button
@@ -476,7 +416,7 @@ const ReplyItem = memo(
           {reply.likes.length.toLocaleString()} ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
         </button>
       );
-    });
+    };
 
     return (
       <div ref={ref} className="bg-gray-200 p-2 rounded">
@@ -501,19 +441,13 @@ const ReplyItem = memo(
   }
 );
 
-const ComplexStats = memo(() => {
+const ComplexStats = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const posts = useSelector((state: RootState) => state.complex.posts);
-  const categories = useSelector((state: RootState) => state.complex.categories);
-  const tags = useSelector((state: RootState) => state.complex.tags);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
-
-  const postsCount = posts.length;
-  const categoriesCount = categories.length;
-  const tagsCount = tags.length;
+  const postsCount = useAppSelector((state) => state.complex.posts.length);
+  const categoriesCount = useAppSelector((state) => state.complex.categories.length);
+  const tagsCount = useAppSelector((state) => state.complex.tags.length);
 
   return (
     <div ref={ref} className="flex flex-wrap items-center justify-between">
@@ -531,27 +465,11 @@ const ComplexStats = memo(() => {
       </div>
     </div>
   );
-});
+};
 
-const CategoriesAndTagsSection = memo(() => {
+const CategoriesAndTagsSection = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const { benchmark, dispatch } = useBenchmark();
-
-  useEffect(() => {
-    debugRender(ref);
-  });
-
-  const addCategories = () => {
-    benchmark(() => {
-      dispatch(addCategory(structuredClone({ ...dummyContent.categories[0], id: shortId() })));
-    });
-  };
-
-  const addTags = () => {
-    benchmark(() => {
-      dispatch(addTag(structuredClone({ ...dummyContent.tags[0], id: shortId() })));
-    });
-  };
+  useDebugRender(ref);
 
   return (
     <div ref={ref} className="space-y-6">
@@ -567,12 +485,7 @@ const CategoriesAndTagsSection = memo(() => {
           <h2 className="font-semibold text-gray-800 text-xl">Categories</h2>
         </div>
         <div className="mb-4">
-          <button
-            onClick={addCategories}
-            className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 flex items-center justify-center gap-2">
-            <BarChart2 size={16} />
-            Benchmark {BENCHMARK_SIZE.toLocaleString()} Categories
-          </button>
+          <AddCategoriesButton />
         </div>
         <div className="max-h-[512px] overflow-y-auto pr-2">
           <CategoryList />
@@ -587,12 +500,7 @@ const CategoriesAndTagsSection = memo(() => {
           <h2 className="font-semibold text-gray-800 text-xl">Tags</h2>
         </div>
         <div className="mb-4">
-          <button
-            onClick={addTags}
-            className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 flex items-center justify-center gap-2">
-            <BarChart2 size={16} />
-            Benchmark {BENCHMARK_SIZE.toLocaleString()} Tags
-          </button>
+          <AddTagsButton />
         </div>
         <div className="max-h-[512px] overflow-y-auto pr-2">
           <TagList />
@@ -600,15 +508,59 @@ const CategoriesAndTagsSection = memo(() => {
       </div>
     </div>
   );
-});
+};
 
-const CategoryList = memo(() => {
+const AddCategoriesButton = () => {
+  const dispatch = useAppDispatch();
+
+  const addCategoriesHandler = () => {
+    benchmark(() => {
+      const newCategories = Array.from({ length: 1 }, () => ({
+        ...structuredClone(dummyContent.categories[0]),
+        id: shortId(),
+      }));
+      dispatch(addCategories(newCategories));
+    });
+  };
+
+  return (
+    <button
+      onClick={addCategoriesHandler}
+      className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 flex items-center justify-center gap-2">
+      <BarChart2 size={16} />
+      Benchmark {BENCHMARK_SIZE.toLocaleString()} Categories
+    </button>
+  );
+};
+
+const AddTagsButton = () => {
+  const dispatch = useAppDispatch();
+
+  const addTagsHandler = () => {
+    benchmark(() => {
+      const newTags = Array.from({ length: 1 }, () => ({
+        ...structuredClone(dummyContent.tags[0]),
+        id: shortId(),
+      }));
+      dispatch(addTags(newTags));
+    });
+  };
+
+  return (
+    <button
+      onClick={addTagsHandler}
+      className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 flex items-center justify-center gap-2">
+      <BarChart2 size={16} />
+      Benchmark {BENCHMARK_SIZE.toLocaleString()} Tags
+    </button>
+  );
+};
+
+const CategoryList = () => {
   const ref = useRef<HTMLUListElement>(null);
-  const categories = useSelector((state: RootState) => state.complex.categories);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const categories = useAppSelector((state) => state.complex.categories);
 
   if (!categories.length) {
     return <p className="text-gray-500 text-center py-4">No categories yet.</p>;
@@ -616,23 +568,21 @@ const CategoryList = memo(() => {
 
   return (
     <ul ref={ref} className="mt-2">
-      {categories.map((category, index) => (
-        <CategoryItem key={category.id} item={category} index={index} />
+      {categories.map((category) => (
+        <CategoryItem key={category.id} item={category} />
       ))}
     </ul>
   );
-});
+};
 
-const CategoryItem = memo(({ item, index }: { item: Category; index: number }) => {
+const CategoryItem = memo(({ item }: { item: Category }) => {
   const ref = useRef<HTMLLIElement>(null);
-  const { dispatch } = useBenchmark();
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const dispatch = useAppDispatch();
 
-  const deleteCategory = () => {
-    dispatch(removeCategory(index));
+  const onDeleteCategory = () => {
+    dispatch(deleteCategory(item.id));
   };
 
   return (
@@ -652,7 +602,7 @@ const CategoryItem = memo(({ item, index }: { item: Category; index: number }) =
         </div>
       </div>
       <button
-        onClick={deleteCategory}
+        onClick={onDeleteCategory}
         className="px-3 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-1">
         <Trash2 size={16} />
       </button>
@@ -660,13 +610,11 @@ const CategoryItem = memo(({ item, index }: { item: Category; index: number }) =
   );
 });
 
-const TagList = memo(() => {
+const TagList = () => {
   const ref = useRef<HTMLUListElement>(null);
-  const tags = useSelector((state: RootState) => state.complex.tags);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const tags = useAppSelector((state) => state.complex.tags);
 
   if (!tags.length) {
     return <p className="text-gray-500 text-center py-4">No tags yet.</p>;
@@ -674,23 +622,21 @@ const TagList = memo(() => {
 
   return (
     <ul ref={ref} className="mt-2">
-      {tags.map((tag, index) => (
-        <TagItem key={tag.id} item={tag} index={index} />
+      {tags.map((tag) => (
+        <TagItem key={tag.id} item={tag} />
       ))}
     </ul>
   );
-});
+};
 
-const TagItem = memo(({ item, index }: { item: TagType; index: number }) => {
+const TagItem = memo(({ item }: { item: TagType }) => {
   const ref = useRef<HTMLLIElement>(null);
-  const { dispatch } = useBenchmark();
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const dispatch = useAppDispatch();
 
-  const deleteTag = () => {
-    dispatch(removeTag(index));
+  const onDeleteTag = () => {
+    dispatch(deleteTag(item.id));
   };
 
   return (
@@ -704,7 +650,7 @@ const TagItem = memo(({ item, index }: { item: TagType; index: number }) => {
         </div>
       </div>
       <button
-        onClick={deleteTag}
+        onClick={onDeleteTag}
         className="px-3 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-1">
         <Trash2 size={16} />
       </button>
