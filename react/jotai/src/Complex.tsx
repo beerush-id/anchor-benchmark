@@ -1,125 +1,302 @@
-import { Eye, MessageSquare, Heart, Trash2, BarChart2, Folder, Tag, User, Calendar, Hash, Reply } from 'lucide-react';
+import { atom, useAtomValue, useSetAtom } from 'jotai';
+import { selectAtom } from 'jotai/utils';
+import { BarChart2, Calendar, Eye, Folder, Hash, Heart, MessageSquare, Reply, Tag, Trash2, User } from 'lucide-react';
 import {
   BENCHMARK_SIZE,
   BENCHMARK_TOGGLE_SIZE,
-  type Post,
   type Category,
-  type Tag as TagType,
   type ComplexState,
   evaluate,
+  type Post,
+  shortId,
+  type Tag as TagType,
 } from '@anchor-benchmark/shared';
-import { atom, useAtomValue, useSetAtom } from 'jotai';
 import { memo, useEffect, useRef } from 'react';
-import RAWJson from './dummyContent.json';
+import dummyData from '@anchor-benchmark/shared/data/dummy-data.json';
 
 // Add typings to the dummy data.
-const dummyContent = RAWJson as unknown as ComplexState;
+const dummyContent = dummyData as unknown as ComplexState;
 
-// Utility function to generate short IDs (similar to Anchor's shortId)
-const shortId = () => Math.random().toString(36).substring(2, 9);
+// Create atoms for state management
+const complexStateAtom = atom<ComplexState>({
+  ...structuredClone(dummyContent),
+  posts: structuredClone(dummyContent.posts),
+  categories: structuredClone(dummyContent.categories),
+  tags: structuredClone(dummyContent.tags),
+});
+
+// Atoms for derived state
+const postsAtom = selectAtom(complexStateAtom, (state) => state.posts);
+const categoriesAtom = selectAtom(complexStateAtom, (state) => state.categories);
+const tagsAtom = selectAtom(complexStateAtom, (state) => state.tags);
 
 // Debug render function to visualize re-renders
-const debugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
-  if (ref.current) {
-    // Check if this is the first render or a re-render
-    if (!ref.current.hasAttribute('data-rendered')) {
-      // First render - red box shadow
-      ref.current.setAttribute('data-rendered', 'true');
-      ref.current.style.boxShadow = '0 0 0 2px red';
-      setTimeout(() => {
-        if (ref.current) {
-          ref.current.style.boxShadow = 'none';
-        }
-      }, 300);
-    } else {
-      // Re-render - blue box shadow
-      ref.current.style.boxShadow = '0 0 0 2px blue';
-      setTimeout(() => {
-        if (ref.current) {
-          ref.current.style.boxShadow = 'none';
-        }
-      }, 300);
+const useDebugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
+  useEffect(() => {
+    if (ref.current) {
+      // Check if this is the first render or a re-render
+      if (!ref.current.hasAttribute('data-rendered')) {
+        // First render - red box shadow
+        ref.current.setAttribute('data-rendered', 'true');
+        ref.current.style.boxShadow = '0 0 0 1px red';
+        setTimeout(() => {
+          if (ref.current) {
+            ref.current.style.boxShadow = 'none';
+          }
+        }, 300);
+      } else {
+        // Re-render - blue box shadow
+        ref.current.style.boxShadow = '0 0 0 1px blue';
+        setTimeout(() => {
+          if (ref.current) {
+            ref.current.style.boxShadow = 'none';
+          }
+        }, 300);
+      }
     }
+  });
+};
+
+// Atoms for actions
+const addPostsAtom = atom(null, (_, set) => {
+  return evaluate(() => {
+    set(complexStateAtom, (prev) => ({
+      ...prev,
+      posts: [...prev.posts, structuredClone({ ...dummyContent.posts[0], id: shortId() })],
+    }));
+  }, BENCHMARK_SIZE);
+});
+
+const incrementViewsAtom = atom(null, (_, set, postId: string) => {
+  set(complexStateAtom, (prev) => {
+    const postIndex = prev.posts.findIndex((p) => p.id === postId);
+    if (postIndex === -1) return prev;
+
+    const updatedPosts = [...prev.posts];
+    updatedPosts[postIndex] = {
+      ...updatedPosts[postIndex],
+      views: updatedPosts[postIndex].views + 1,
+    };
+
+    return {
+      ...prev,
+      posts: updatedPosts,
+    };
+  });
+});
+
+const incrementViewsBenchmarkAtom = atom(null, (_, set, postId: string) => {
+  return evaluate(() => {
+    set(incrementViewsAtom, postId);
+  }, BENCHMARK_TOGGLE_SIZE);
+});
+
+const addLikeToPostAtom = atom(null, (_, set, postId: string) => {
+  set(complexStateAtom, (prev) => {
+    const postIndex = prev.posts.findIndex((p) => p.id === postId);
+    if (postIndex === -1) return prev;
+
+    const updatedPosts = [...prev.posts];
+    updatedPosts[postIndex] = {
+      ...updatedPosts[postIndex],
+      likes: [...updatedPosts[postIndex].likes, shortId()],
+    };
+
+    return {
+      ...prev,
+      posts: updatedPosts,
+    };
+  });
+});
+
+const addLikeToPostBenchmarkAtom = atom(null, (_, set, postId: string) => {
+  return evaluate(() => {
+    set(addLikeToPostAtom, postId);
+  }, BENCHMARK_TOGGLE_SIZE);
+});
+
+const addCommentToPostAtom = atom(null, (_, set, postId: string) => {
+  set(complexStateAtom, (prev) => {
+    const postIndex = prev.posts.findIndex((p) => p.id === postId);
+    if (postIndex === -1) return prev;
+
+    const updatedPosts = [...prev.posts];
+    updatedPosts[postIndex] = {
+      ...updatedPosts[postIndex],
+      comments: [
+        ...updatedPosts[postIndex].comments,
+        { ...structuredClone(dummyContent.posts[0].comments[0]), id: shortId() },
+      ],
+    };
+
+    return {
+      ...prev,
+      posts: updatedPosts,
+    };
+  });
+});
+
+const addCommentToPostBenchmarkAtom = atom(null, (_, set, postId: string) => {
+  return evaluate(() => {
+    set(addCommentToPostAtom, postId);
+  }, BENCHMARK_TOGGLE_SIZE);
+});
+
+const deletePostAtom = atom(null, (_, set, postId: string) => {
+  set(complexStateAtom, (prev) => ({
+    ...prev,
+    posts: prev.posts.filter((p) => p.id !== postId),
+  }));
+});
+
+const addLikeToCommentAtom = atom(null, (_, set, { postId, commentId }: { postId: string; commentId: string }) => {
+  set(complexStateAtom, (prev) => {
+    const postIndex = prev.posts.findIndex((p) => p.id === postId);
+    if (postIndex === -1) return prev;
+
+    const commentIndex = prev.posts[postIndex].comments.findIndex((c) => c.id === commentId);
+    if (commentIndex === -1) return prev;
+
+    const updatedPosts = [...prev.posts];
+    updatedPosts[postIndex] = {
+      ...updatedPosts[postIndex],
+      comments: [...updatedPosts[postIndex].comments],
+    };
+
+    updatedPosts[postIndex].comments[commentIndex] = {
+      ...updatedPosts[postIndex].comments[commentIndex],
+      likes: [...updatedPosts[postIndex].comments[commentIndex].likes, shortId()],
+    };
+
+    return {
+      ...prev,
+      posts: updatedPosts,
+    };
+  });
+});
+
+const addLikeToCommentBenchmarkAtom = atom(null, (_, set, params: { postId: string; commentId: string }) => {
+  return evaluate(() => {
+    set(addLikeToCommentAtom, params);
+  }, BENCHMARK_TOGGLE_SIZE);
+});
+
+const addReplyToCommentAtom = atom(null, (_, set, { postId, commentId }: { postId: string; commentId: string }) => {
+  set(complexStateAtom, (prev) => {
+    const postIndex = prev.posts.findIndex((p) => p.id === postId);
+    if (postIndex === -1) return prev;
+
+    const commentIndex = prev.posts[postIndex].comments.findIndex((c) => c.id === commentId);
+    if (commentIndex === -1) return prev;
+
+    const updatedPosts = [...prev.posts];
+    updatedPosts[postIndex] = {
+      ...updatedPosts[postIndex],
+      comments: [...updatedPosts[postIndex].comments],
+    };
+
+    updatedPosts[postIndex].comments[commentIndex] = {
+      ...updatedPosts[postIndex].comments[commentIndex],
+      replies: [
+        ...updatedPosts[postIndex].comments[commentIndex].replies,
+        { ...structuredClone(dummyContent.posts[0].comments[0]), id: shortId() },
+      ],
+    };
+
+    return {
+      ...prev,
+      posts: updatedPosts,
+    };
+  });
+});
+
+const addReplyToCommentBenchmarkAtom = atom(null, (_, set, params: { postId: string; commentId: string }) => {
+  return evaluate(() => {
+    set(addReplyToCommentAtom, params);
+  }, BENCHMARK_TOGGLE_SIZE);
+});
+
+const addLikeToReplyAtom = atom(
+  null,
+  (_, set, { postId, commentId, replyId }: { postId: string; commentId: string; replyId: string }) => {
+    set(complexStateAtom, (prev) => {
+      const postIndex = prev.posts.findIndex((p) => p.id === postId);
+      if (postIndex === -1) return prev;
+
+      const commentIndex = prev.posts[postIndex].comments.findIndex((c) => c.id === commentId);
+      if (commentIndex === -1) return prev;
+
+      const replyIndex = prev.posts[postIndex].comments[commentIndex].replies.findIndex((r) => r.id === replyId);
+      if (replyIndex === -1) return prev;
+
+      const updatedPosts = [...prev.posts];
+      updatedPosts[postIndex] = {
+        ...updatedPosts[postIndex],
+        comments: [...updatedPosts[postIndex].comments],
+      };
+
+      updatedPosts[postIndex].comments[commentIndex] = {
+        ...updatedPosts[postIndex].comments[commentIndex],
+        replies: [...updatedPosts[postIndex].comments[commentIndex].replies],
+      };
+
+      updatedPosts[postIndex].comments[commentIndex].replies[replyIndex] = {
+        ...updatedPosts[postIndex].comments[commentIndex].replies[replyIndex],
+        likes: [...updatedPosts[postIndex].comments[commentIndex].replies[replyIndex].likes, shortId()],
+      };
+
+      return {
+        ...prev,
+        posts: updatedPosts,
+      };
+    });
   }
-};
-
-// Define atoms for our state
-const complexStateAtom = atom<ComplexState>(structuredClone(dummyContent) as ComplexState);
-
-// Atoms for individual parts of the state
-const postsAtom = atom(
-  (get) => get(complexStateAtom).posts,
-  (get, set, posts: Post[]) => set(complexStateAtom, { ...get(complexStateAtom), posts })
 );
 
-const categoriesAtom = atom(
-  (get) => get(complexStateAtom).categories,
-  (get, set, categories: Category[]) => set(complexStateAtom, { ...get(complexStateAtom), categories })
+const addLikeToReplyBenchmarkAtom = atom(
+  null,
+  (_, set, params: { postId: string; commentId: string; replyId: string }) => {
+    return evaluate(() => {
+      set(addLikeToReplyAtom, params);
+    }, BENCHMARK_TOGGLE_SIZE);
+  }
 );
 
-const tagsAtom = atom(
-  (get) => get(complexStateAtom).tags,
-  (get, set, tags: TagType[]) => set(complexStateAtom, { ...get(complexStateAtom), tags })
-);
-
-// Benchmark functions
-const useBenchmark = () => {
-  const setComplexState = useSetAtom(complexStateAtom);
-  const posts = useAtomValue(postsAtom);
-  const categories = useAtomValue(categoriesAtom);
-  const tags = useAtomValue(tagsAtom);
-
-  const benchmark = (fn: () => void) => {
-    return evaluate(fn, BENCHMARK_SIZE);
-  };
-
-  const toggleBenchmark = (fn: () => void) => {
-    return evaluate(fn, BENCHMARK_TOGGLE_SIZE);
-  };
-
-  // Specific actions for benchmarking
-  const addPost = () => {
-    const newPost = structuredClone({ ...dummyContent.posts[0], id: shortId() });
-    setComplexState((prev) => ({
+const addCategoryAtom = atom(null, (_, set) => {
+  return evaluate(() => {
+    set(complexStateAtom, (prev) => ({
       ...prev,
-      posts: [...prev.posts, newPost],
+      categories: [...prev.categories, structuredClone({ ...dummyContent.categories[0], id: shortId() })],
     }));
-  };
+  }, BENCHMARK_SIZE);
+});
 
-  const addCategory = () => {
-    const newCategory = structuredClone({ ...dummyContent.categories[0], id: shortId() });
-    setComplexState((prev) => ({
+const deleteCategoryAtom = atom(null, (_, set, categoryId: string) => {
+  set(complexStateAtom, (prev) => ({
+    ...prev,
+    categories: prev.categories.filter((c) => c.id !== categoryId),
+  }));
+});
+
+const addTagAtom = atom(null, (_, set) => {
+  return evaluate(() => {
+    set(complexStateAtom, (prev) => ({
       ...prev,
-      categories: [...prev.categories, newCategory],
+      tags: [...prev.tags, structuredClone({ ...dummyContent.tags[0], id: shortId() })],
     }));
-  };
+  }, BENCHMARK_SIZE);
+});
 
-  const addTag = () => {
-    const newTag = structuredClone({ ...dummyContent.tags[0], id: shortId() });
-    setComplexState((prev) => ({
-      ...prev,
-      tags: [...prev.tags, newTag],
-    }));
-  };
-
-  return {
-    benchmark,
-    toggleBenchmark,
-    addPost,
-    addCategory,
-    addTag,
-    posts,
-    categories,
-    tags,
-  };
-};
+const deleteTagAtom = atom(null, (_, set, tagId: string) => {
+  set(complexStateAtom, (prev) => ({
+    ...prev,
+    tags: prev.tags.filter((t) => t.id !== tagId),
+  }));
+});
 
 export default function Complex() {
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 sm:p-6">
@@ -145,15 +322,9 @@ export default function Complex() {
 
 const PostsSection = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const { benchmark, addPost } = useBenchmark();
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
-
-  const addPosts = () => {
-    benchmark(addPost);
-  };
+  const addPosts = useSetAtom(addPostsAtom);
 
   return (
     <div ref={ref} className="bg-white rounded-2xl shadow-xs p-6 h-full">
@@ -164,7 +335,7 @@ const PostsSection = () => {
         <h2 className="font-semibold text-gray-800 text-xl">Posts</h2>
         <span className="flex-1"></span>
         <button
-          onClick={addPosts}
+          onClick={() => addPosts()}
           className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 flex items-center justify-center gap-2">
           <BarChart2 size={16} />
           Add {BENCHMARK_SIZE.toLocaleString()} Posts
@@ -177,11 +348,9 @@ const PostsSection = () => {
 
 const PostList = () => {
   const ref = useRef<HTMLUListElement>(null);
-  const posts = useAtomValue(postsAtom);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const posts = useAtomValue(postsAtom);
 
   if (!posts.length) {
     return <p className="text-gray-500 text-center py-4">No posts yet.</p>;
@@ -198,290 +367,161 @@ const PostList = () => {
 
 const PostItem = memo(({ item }: { item: Post }) => {
   const ref = useRef<HTMLLIElement>(null);
-  const { toggleBenchmark } = useBenchmark();
-  const setComplexState = useSetAtom(complexStateAtom);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const incrementViewsBenchmark = useSetAtom(incrementViewsBenchmarkAtom);
+  const addLikeToPostBenchmark = useSetAtom(addLikeToPostBenchmarkAtom);
+  const addCommentToPostBenchmark = useSetAtom(addCommentToPostBenchmarkAtom);
+  const deletePost = useSetAtom(deletePostAtom);
 
-  const incrementViews = () => {
-    setComplexState((prev) => {
-      const newPosts = [...prev.posts];
-      const index = newPosts.findIndex((p) => p.id === item.id);
-      if (index !== -1) {
-        newPosts[index] = { ...newPosts[index], views: newPosts[index].views + 1 };
-      }
-      return { ...prev, posts: newPosts };
-    });
+  const handleIncrementViewsBenchmark = () => {
+    incrementViewsBenchmark(item.id);
   };
 
-  const addLike = () => {
-    setComplexState((prev) => {
-      const newPosts = [...prev.posts];
-      const postIndex = newPosts.findIndex((p) => p.id === item.id);
-      if (postIndex !== -1) {
-        const newLikes = [...newPosts[postIndex].likes, shortId()];
-        newPosts[postIndex] = { ...newPosts[postIndex], likes: newLikes };
-      }
-      return { ...prev, posts: newPosts };
-    });
+  const handleAddLikeBenchmark = () => {
+    addLikeToPostBenchmark(item.id);
   };
 
-  const addComment = () => {
-    setComplexState((prev) => {
-      const newPosts = [...prev.posts];
-      const postIndex = newPosts.findIndex((p) => p.id === item.id);
-      if (postIndex !== -1) {
-        const newComments = [
-          ...newPosts[postIndex].comments,
-          {
-            ...structuredClone(dummyContent.posts[0].comments[0]),
-            id: shortId(),
-          },
-        ];
-        newPosts[postIndex] = { ...newPosts[postIndex], comments: newComments };
-      }
-      return { ...prev, posts: newPosts };
-    });
+  const handleAddCommentBenchmark = () => {
+    addCommentToPostBenchmark(item.id);
   };
 
-  const deletePost = () => {
-    setComplexState((prev) => {
-      const newPosts = [...prev.posts];
-      const index = newPosts.findIndex((p) => p.id === item.id);
-      if (index !== -1) {
-        newPosts.splice(index, 1);
-      }
-      return { ...prev, posts: newPosts };
-    });
+  const handleDeletePost = () => {
+    deletePost(item.id);
   };
-
-  const PostStats = memo(() => {
-    const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      debugRender(ref);
-    });
-
-    return (
-      <div ref={ref} className="flex flex-wrap gap-2 mb-3">
-        <span className="font-medium text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full flex items-center gap-1">
-          <Eye size={14} /> {item.views.toLocaleString()}
-        </span>
-        <span className="font-medium text-xs bg-red-100 text-red-800 px-3 py-1 rounded-full flex items-center gap-1">
-          <Heart size={14} /> {item.likes.length.toLocaleString()}
-        </span>
-        <span className="font-medium text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center gap-1">
-          <MessageSquare size={14} /> {item.comments.length.toLocaleString()}
-        </span>
-        <span className="font-medium text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded-full">{item.status}</span>
-      </div>
-    );
-  });
-
-  const PostInfo = memo(() => {
-    const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      debugRender(ref);
-    });
-
-    return (
-      <div ref={ref} className="flex flex-col bg-gray-50 p-4 rounded-lg">
-        <div className="flex items-start gap-4">
-          <div className="bg-gray-200 border-2 border-dashed rounded-xl w-16 h-16 flex-shrink-0" />
-          <div className="flex-1">
-            <h3 className="font-bold text-gray-800 text-xl mb-2">{item.title}</h3>
-            <PostStats />
-            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 mb-3">
-              <span className="flex items-center gap-1">
-                <User size={14} /> {item.metadata.lastEditor.username}
-              </span>
-              <span className="flex items-center gap-1">
-                <Calendar size={14} /> {new Date(item.createdAt).toLocaleDateString()}
-              </span>
-              <span className="flex items-center gap-1">
-                <Hash size={14} /> {item.tags.length} tags
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 text-gray-700">{item.content.substring(0, 300)}...</div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {item.tags.map((tag, index) => (
-            <span key={index} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-              #{tag}
-            </span>
-          ))}
-        </div>
-      </div>
-    );
-  });
-
-  const PostComments = memo(() => {
-    const ref = useRef<HTMLDivElement>(null);
-    const displayedComments = item.comments.slice(0, 5);
-
-    useEffect(() => {
-      debugRender(ref);
-    });
-
-    return (
-      <>
-        {displayedComments.length > 0 && (
-          <div ref={ref} className="mt-4 ml-2 pl-4 border-l-2 border-gray-200 flex flex-col gap-3">
-            <h4 className="font-semibold text-gray-700 flex items-center gap-2">
-              <MessageSquare size={16} />
-              Comments ({item.comments.length.toLocaleString()})
-            </h4>
-            {displayedComments.map(
-              (comment, index) => index < 5 && <CommentItem key={comment.id} comment={comment} postId={item.id} />
-            )}
-          </div>
-        )}
-      </>
-    );
-  });
 
   return (
     <li ref={ref} className="mb-6 last:mb-0">
-      <PostInfo />
+      <PostInfo item={item} />
       <div className="mt-4 flex flex-wrap justify-end gap-2">
         <button
-          onClick={() => toggleBenchmark(incrementViews)}
+          onClick={handleIncrementViewsBenchmark}
           className="px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-1">
           <Eye size={16} />
           View ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
         </button>
         <button
-          onClick={() => toggleBenchmark(addLike)}
+          onClick={handleAddLikeBenchmark}
           className="px-3 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-1">
           <Heart size={16} />
           Like ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
         </button>
         <button
-          onClick={() => toggleBenchmark(addComment)}
+          onClick={handleAddCommentBenchmark}
           className="px-3 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-1">
           <MessageSquare size={16} />
           Comment ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
         </button>
         <button
-          onClick={deletePost}
+          onClick={handleDeletePost}
           className="px-3 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-1">
           <Trash2 size={16} />
         </button>
       </div>
-      <PostComments />
+      <PostComments item={item} />
     </li>
+  );
+});
+
+const PostInfo = memo(({ item }: { item: Post }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  useDebugRender(ref);
+
+  return (
+    <div ref={ref} className="flex flex-col bg-gray-50 p-4 rounded-lg">
+      <div className="flex items-start gap-4">
+        <div className="bg-gray-200 border-2 border-dashed rounded-xl w-16 h-16 flex-shrink-0" />
+        <div className="flex-1">
+          <h3 className="font-bold text-gray-800 text-xl mb-2">{item.title}</h3>
+          <PostStats item={item} />
+          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 mb-3">
+            <span className="flex items-center gap-1">
+              <User size={14} /> {item.metadata.lastEditor.username}
+            </span>
+            <span className="flex items-center gap-1">
+              <Calendar size={14} /> {new Date(item.createdAt).toLocaleDateString()}
+            </span>
+            <span className="flex items-center gap-1">
+              <Hash size={14} /> {item.tags.length} tags
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 text-gray-700">{item.content.substring(0, 300)}...</div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {item.tags.map((tag, index) => (
+          <span key={index} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+            #{tag}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+});
+
+const PostStats = memo(({ item }: { item: Post }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  useDebugRender(ref);
+
+  return (
+    <div ref={ref} className="flex flex-wrap gap-2 mb-3">
+      <span className="font-medium text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full flex items-center gap-1">
+        <Eye size={14} /> {item.views.toLocaleString()}
+      </span>
+      <span className="font-medium text-xs bg-red-100 text-red-800 px-3 py-1 rounded-full flex items-center gap-1">
+        <Heart size={14} /> {item.likes.length.toLocaleString()}
+      </span>
+      <span className="font-medium text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center gap-1">
+        <MessageSquare size={14} /> {item.comments.length.toLocaleString()}
+      </span>
+      <span className="font-medium text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded-full">{item.status}</span>
+    </div>
+  );
+});
+
+const PostComments = memo(({ item }: { item: Post }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  useDebugRender(ref);
+
+  const displayedComments = item.comments.slice(0, 5);
+
+  return (
+    <>
+      {displayedComments.length > 0 && (
+        <div ref={ref} className="mt-4 ml-2 pl-4 border-l-2 border-gray-200 flex flex-col gap-3">
+          <h4 className="font-semibold text-gray-700 flex items-center gap-2">
+            <MessageSquare size={16} />
+            Comments ({item.comments.length.toLocaleString()})
+          </h4>
+          {displayedComments.map((comment) => (
+            <CommentItem key={comment.id} comment={comment} postId={item.id} />
+          ))}
+        </div>
+      )}
+    </>
   );
 });
 
 const CommentItem = memo(({ comment, postId }: { comment: Post['comments'][number]; postId: string }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const { toggleBenchmark } = useBenchmark();
-  const setComplexState = useSetAtom(complexStateAtom);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const addLikeToCommentBenchmark = useSetAtom(addLikeToCommentBenchmarkAtom);
+  const addReplyToCommentBenchmark = useSetAtom(addReplyToCommentBenchmarkAtom);
 
-  const addLike = () => {
-    setComplexState((prev) => {
-      const newPosts = [...prev.posts];
-      const postIndex = newPosts.findIndex((p) => p.id === postId);
-      if (postIndex !== -1) {
-        const newComments = [...newPosts[postIndex].comments];
-        const commentIndex = newComments.findIndex((c) => c.id === comment.id);
-        if (commentIndex !== -1) {
-          const newLikes = [...newComments[commentIndex].likes, shortId()];
-          newComments[commentIndex] = { ...newComments[commentIndex], likes: newLikes };
-          newPosts[postIndex] = { ...newPosts[postIndex], comments: newComments };
-        }
-      }
-      return { ...prev, posts: newPosts };
-    });
+  const handleAddLikeBenchmark = () => {
+    addLikeToCommentBenchmark({ postId, commentId: comment.id });
   };
 
-  const addReply = () => {
-    setComplexState((prev) => {
-      const newPosts = [...prev.posts];
-      const postIndex = newPosts.findIndex((p) => p.id === postId);
-      if (postIndex !== -1) {
-        const newComments = [...newPosts[postIndex].comments];
-        const commentIndex = newComments.findIndex((c) => c.id === comment.id);
-        if (commentIndex !== -1) {
-          const newReplies = [
-            ...newComments[commentIndex].replies,
-            {
-              ...structuredClone(dummyContent.posts[0].comments[0]),
-              id: shortId(),
-            },
-          ];
-          newComments[commentIndex] = { ...newComments[commentIndex], replies: newReplies };
-          newPosts[postIndex] = { ...newPosts[postIndex], comments: newComments };
-        }
-      }
-      return { ...prev, posts: newPosts };
-    });
+  const handleAddReplyBenchmark = () => {
+    addReplyToCommentBenchmark({ postId, commentId: comment.id });
   };
 
   const deleteComment = () => {
     console.log('Delete comment', comment.id);
   };
-
-  const CommentStats = memo(() => {
-    const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      debugRender(ref);
-    });
-
-    return (
-      <div ref={ref} className="flex gap-4 items-center">
-        <button onClick={() => toggleBenchmark(addLike)} className="flex items-center gap-1 hover:text-red-500">
-          <span className="flex items-center gap-1 bg-slate-200 rounded-sm px-1 py-0.5 font-medium text-xs">
-            <Heart size={14} />
-            <span>{comment.likes.length.toLocaleString()}</span>
-          </span>
-          <span className="font-medium">Like ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)</span>
-        </button>
-        <button onClick={() => toggleBenchmark(addReply)} className="flex items-center gap-1 hover:text-blue-500">
-          <span className="flex items-center gap-1 bg-slate-200 rounded-sm px-1 py-0.5 font-medium text-xs">
-            <Reply size={14} />
-            <span>{comment.replies.length.toLocaleString()}</span>
-          </span>
-          <span className="font-medium">Reply ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)</span>
-        </button>
-      </div>
-    );
-  });
-
-  const CommentReplies = memo(() => {
-    const ref = useRef<HTMLDivElement>(null);
-    const replies = comment.replies.slice(0, 3);
-
-    useEffect(() => {
-      debugRender(ref);
-    });
-
-    return (
-      <>
-        {replies.length > 0 && (
-          <div className="mt-3 ml-2 pl-3 border-l-2 border-gray-300">
-            <h5 className="text-xs font-semibold text-gray-600 mb-2">Replies ({replies.length.toLocaleString()})</h5>
-            <div className="space-y-3">
-              {replies.map((reply) => (
-                <ReplyItem key={reply.id} reply={reply} postId={postId} commentId={comment.id} />
-              ))}
-            </div>
-          </div>
-        )}
-      </>
-    );
-  });
 
   return (
     <div ref={ref} className="bg-gray-100 p-3 rounded-lg">
@@ -494,15 +534,58 @@ const CommentItem = memo(({ comment, postId }: { comment: Post['comments'][numbe
           </div>
           <p className="text-gray-700 text-sm mb-2">{comment.content}</p>
           <div className="flex items-center gap-3 text-xs text-gray-600">
-            <CommentStats />
+            <div className="flex items-center gap-1 hover:text-red-500">
+              <button
+                onClick={handleAddLikeBenchmark}
+                className="flex items-center gap-1 bg-slate-200 rounded-sm px-1 py-0.5 font-medium text-xs">
+                <Heart size={14} />
+                <span>{comment.likes.length.toLocaleString()}</span>
+              </button>
+              <button onClick={handleAddLikeBenchmark} className="font-medium">
+                Like ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
+              </button>
+            </div>
+            <div className="flex items-center gap-1 hover:text-blue-500">
+              <button
+                onClick={handleAddReplyBenchmark}
+                className="flex items-center gap-1 bg-slate-200 rounded-sm px-1 py-0.5 font-medium text-xs">
+                <Reply size={14} />
+                <span>{comment.replies.length.toLocaleString()}</span>
+              </button>
+              <button onClick={handleAddReplyBenchmark} className="font-medium">
+                Reply ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
+              </button>
+            </div>
             <button onClick={deleteComment} className="flex items-center gap-1 hover:text-gray-800">
               <Trash2 size={14} />
             </button>
           </div>
         </div>
       </div>
-      <CommentReplies />
+      <CommentReplies comment={comment} postId={postId} />
     </div>
+  );
+});
+
+const CommentReplies = memo(({ comment, postId }: { comment: Post['comments'][number]; postId: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  useDebugRender(ref);
+
+  const replies = comment.replies.slice(0, 3);
+
+  return (
+    <>
+      {replies.length > 0 && (
+        <div className="mt-3 ml-2 pl-3 border-l-2 border-gray-300">
+          <h5 className="text-xs font-semibold text-gray-600 mb-2">Replies ({replies.length.toLocaleString()})</h5>
+          <div className="space-y-3">
+            {replies.map((reply) => (
+              <ReplyItem key={reply.id} reply={reply} postId={postId} commentId={comment.id} />
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 });
 
@@ -517,56 +600,17 @@ const ReplyItem = memo(
     commentId: string;
   }) => {
     const ref = useRef<HTMLDivElement>(null);
-    const { toggleBenchmark } = useBenchmark();
-    const setComplexState = useSetAtom(complexStateAtom);
+    useDebugRender(ref);
 
-    useEffect(() => {
-      debugRender(ref);
-    });
+    const addLikeToReplyBenchmark = useSetAtom(addLikeToReplyBenchmarkAtom);
 
-    const addLike = () => {
-      setComplexState((prev) => {
-        const newPosts = [...prev.posts];
-        const postIndex = newPosts.findIndex((p) => p.id === postId);
-        if (postIndex !== -1) {
-          const newComments = [...newPosts[postIndex].comments];
-          const commentIndex = newComments.findIndex((c) => c.id === commentId);
-          if (commentIndex !== -1) {
-            const newReplies = [...newComments[commentIndex].replies];
-            const replyIndex = newReplies.findIndex((r) => r.id === reply.id);
-            if (replyIndex !== -1) {
-              const newLikes = [...newReplies[replyIndex].likes, shortId()];
-              newReplies[replyIndex] = { ...newReplies[replyIndex], likes: newLikes };
-              newComments[commentIndex] = { ...newComments[commentIndex], replies: newReplies };
-              newPosts[postIndex] = { ...newPosts[postIndex], comments: newComments };
-            }
-          }
-        }
-        return { ...prev, posts: newPosts };
-      });
+    const handleAddLikeBenchmark = () => {
+      addLikeToReplyBenchmark({ postId, commentId, replyId: reply.id });
     };
 
     const deleteReply = () => {
       console.log('Delete reply', reply.id);
     };
-
-    const LikesCount = memo(() => {
-      const ref = useRef<HTMLButtonElement>(null);
-
-      useEffect(() => {
-        debugRender(ref);
-      });
-
-      return (
-        <button
-          ref={ref}
-          onClick={() => toggleBenchmark(addLike)}
-          className="flex items-center gap-1 hover:text-red-500">
-          <Heart size={12} />
-          {reply.likes.length.toLocaleString()} ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
-        </button>
-      );
-    });
 
     return (
       <div ref={ref} className="bg-gray-200 p-2 rounded">
@@ -579,7 +623,10 @@ const ReplyItem = memo(
             </div>
             <p className="text-gray-700 text-xs mb-1">{reply.content}</p>
             <div className="flex items-center gap-2 text-xs text-gray-600">
-              <LikesCount />
+              <button onClick={handleAddLikeBenchmark} className="flex items-center gap-1 hover:text-red-500">
+                <Heart size={12} />
+                {reply.likes.length.toLocaleString()} ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
+              </button>
               <button onClick={deleteReply} className="flex items-center gap-1 hover:text-gray-800">
                 <Trash2 size={12} />
               </button>
@@ -591,15 +638,13 @@ const ReplyItem = memo(
   }
 );
 
-const ComplexStats = memo(() => {
+const ComplexStats = () => {
   const ref = useRef<HTMLDivElement>(null);
+  useDebugRender(ref);
+
   const posts = useAtomValue(postsAtom);
   const categories = useAtomValue(categoriesAtom);
   const tags = useAtomValue(tagsAtom);
-
-  useEffect(() => {
-    debugRender(ref);
-  });
 
   const postsCount = posts.length;
   const categoriesCount = categories.length;
@@ -621,23 +666,14 @@ const ComplexStats = memo(() => {
       </div>
     </div>
   );
-});
+};
 
 const CategoriesAndTagsSection = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const { benchmark, addCategory, addTag } = useBenchmark();
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
-
-  const addCategories = () => {
-    benchmark(addCategory);
-  };
-
-  const addTags = () => {
-    benchmark(addTag);
-  };
+  const addCategory = useSetAtom(addCategoryAtom);
+  const addTag = useSetAtom(addTagAtom);
 
   return (
     <div ref={ref} className="space-y-6">
@@ -654,7 +690,7 @@ const CategoriesAndTagsSection = () => {
         </div>
         <div className="mb-4">
           <button
-            onClick={addCategories}
+            onClick={() => addCategory()}
             className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 flex items-center justify-center gap-2">
             <BarChart2 size={16} />
             Benchmark {BENCHMARK_SIZE.toLocaleString()} Categories
@@ -674,7 +710,7 @@ const CategoriesAndTagsSection = () => {
         </div>
         <div className="mb-4">
           <button
-            onClick={addTags}
+            onClick={() => addTag()}
             className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 flex items-center justify-center gap-2">
             <BarChart2 size={16} />
             Benchmark {BENCHMARK_SIZE.toLocaleString()} Tags
@@ -690,11 +726,9 @@ const CategoriesAndTagsSection = () => {
 
 const CategoryList = () => {
   const ref = useRef<HTMLUListElement>(null);
-  const categories = useAtomValue(categoriesAtom);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const categories = useAtomValue(categoriesAtom);
 
   if (!categories.length) {
     return <p className="text-gray-500 text-center py-4">No categories yet.</p>;
@@ -711,21 +745,12 @@ const CategoryList = () => {
 
 const CategoryItem = memo(({ item }: { item: Category }) => {
   const ref = useRef<HTMLLIElement>(null);
-  const setComplexState = useSetAtom(complexStateAtom);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const deleteCategory = useSetAtom(deleteCategoryAtom);
 
-  const deleteCategory = () => {
-    setComplexState((prev) => {
-      const newCategories = [...prev.categories];
-      const index = newCategories.findIndex((c) => c.id === item.id);
-      if (index !== -1) {
-        newCategories.splice(index, 1);
-      }
-      return { ...prev, categories: newCategories };
-    });
+  const handleDeleteCategory = () => {
+    deleteCategory(item.id);
   };
 
   return (
@@ -745,7 +770,7 @@ const CategoryItem = memo(({ item }: { item: Category }) => {
         </div>
       </div>
       <button
-        onClick={deleteCategory}
+        onClick={handleDeleteCategory}
         className="px-3 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-1">
         <Trash2 size={16} />
       </button>
@@ -755,11 +780,9 @@ const CategoryItem = memo(({ item }: { item: Category }) => {
 
 const TagList = () => {
   const ref = useRef<HTMLUListElement>(null);
-  const tags = useAtomValue(tagsAtom);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const tags = useAtomValue(tagsAtom);
 
   if (!tags.length) {
     return <p className="text-gray-500 text-center py-4">No tags yet.</p>;
@@ -776,21 +799,12 @@ const TagList = () => {
 
 const TagItem = memo(({ item }: { item: TagType }) => {
   const ref = useRef<HTMLLIElement>(null);
-  const setComplexState = useSetAtom(complexStateAtom);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const deleteTag = useSetAtom(deleteTagAtom);
 
-  const deleteTag = () => {
-    setComplexState((prev) => {
-      const newTags = [...prev.tags];
-      const index = newTags.findIndex((t) => t.id === item.id);
-      if (index !== -1) {
-        newTags.splice(index, 1);
-      }
-      return { ...prev, tags: newTags };
-    });
+  const handleDeleteTag = () => {
+    deleteTag(item.id);
   };
 
   return (
@@ -804,7 +818,7 @@ const TagItem = memo(({ item }: { item: TagType }) => {
         </div>
       </div>
       <button
-        onClick={deleteTag}
+        onClick={handleDeleteTag}
         className="px-3 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-1">
         <Trash2 size={16} />
       </button>
