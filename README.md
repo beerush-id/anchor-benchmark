@@ -10,8 +10,8 @@ This project includes the following **Workspaces** and **Packages**:
 
 ### Workspaces
 
-- `**react**` (**React Applications**) - React applications implementing different state management solutions.
-- `**packages**` (**Packages**) - Packages are where your shared libraries live.
+- **`react`** (**React Applications**) - React applications implementing different state management solutions.
+- **`packages`** (**Packages**) - Packages are where your shared libraries live.
 
 ### React State Management Implementations
 
