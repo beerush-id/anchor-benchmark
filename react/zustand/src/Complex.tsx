@@ -1,70 +1,79 @@
-import { Eye, MessageSquare, Heart, Trash2, BarChart2, Folder, Tag, User, Calendar, Hash, Reply } from 'lucide-react';
+import { BarChart2, Calendar, Eye, Folder, Hash, Heart, MessageSquare, Reply, Tag, Trash2, User } from 'lucide-react';
 import {
   BENCHMARK_SIZE,
   BENCHMARK_TOGGLE_SIZE,
-  type Post,
   type Category,
-  type Tag as TagType,
   type ComplexState,
   evaluate,
+  type Post,
+  shortId,
+  type Tag as TagType,
 } from '@anchor-benchmark/shared';
 import { memo, useEffect, useRef } from 'react';
-import RAWJson from './dummyContent.json';
-import { useComplexStore } from './useComplexStore.js';
+import dummyData from '@anchor-benchmark/shared/data/dummy-data.json';
+import {
+  selectCategories,
+  selectCategoriesCount,
+  selectCommentLikesCount,
+  selectCommentReplies,
+  selectCommentRepliesCount,
+  selectPostComments,
+  selectPostCommentsCount,
+  selectPostLikesCount,
+  selectPosts,
+  selectPostsCount,
+  selectPostStatus,
+  selectPostViews,
+  selectReplyLikesCount,
+  selectTags,
+  selectTagsCount,
+  useComplexStore,
+} from './useComplexStore';
 
 // Add typings to the dummy data.
-const dummyContent = RAWJson as unknown as ComplexState;
-
-// Utility function to generate short IDs (similar to Anchor's shortId)
-const shortId = () => Math.random().toString(36).substring(2, 9);
+const dummyContent = dummyData as unknown as ComplexState;
 
 // Debug render function to visualize re-renders
-const debugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
-  if (ref.current) {
-    // Check if this is the first render or a re-render
-    if (!ref.current.hasAttribute('data-rendered')) {
-      // First render - red box shadow
-      ref.current.setAttribute('data-rendered', 'true');
-      ref.current.style.boxShadow = '0 0 0 2px red';
-      setTimeout(() => {
-        if (ref.current) {
-          ref.current.style.boxShadow = 'none';
-        }
-      }, 300);
-    } else {
-      // Re-render - blue box shadow
-      ref.current.style.boxShadow = '0 0 0 2px blue';
-      setTimeout(() => {
-        if (ref.current) {
-          ref.current.style.boxShadow = 'none';
-        }
-      }, 300);
+const useDebugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {
+  useEffect(() => {
+    if (ref.current) {
+      // Check if this is the first render or a re-render
+      if (!ref.current.hasAttribute('data-rendered')) {
+        // First render - red box shadow
+        ref.current.setAttribute('data-rendered', 'true');
+        ref.current.style.boxShadow = '0 0 0 1px red';
+        setTimeout(() => {
+          if (ref.current) {
+            ref.current.style.boxShadow = 'none';
+          }
+        }, 300);
+      } else {
+        // Re-render - blue box shadow
+        ref.current.style.boxShadow = '0 0 0 1px blue';
+        setTimeout(() => {
+          if (ref.current) {
+            ref.current.style.boxShadow = 'none';
+          }
+        }, 300);
+      }
     }
-  }
+  });
 };
 
-// Benchmark functions
-const useBenchmark = () => {
-  const benchmark = (fn: () => void) => {
-    return evaluate(fn, BENCHMARK_SIZE);
-  };
+const benchmark = (fn: () => void) => {
+  return evaluate(fn, BENCHMARK_SIZE);
+};
 
-  const toggleBenchmark = (fn: () => void) => {
-    return evaluate(fn, BENCHMARK_TOGGLE_SIZE);
-  };
-
-  return { benchmark, toggleBenchmark };
+const toggleBenchmark = (fn: () => void) => {
+  return evaluate(fn, BENCHMARK_TOGGLE_SIZE);
 };
 
 export default function Complex() {
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    debugRender(ref);
-  });
+  useDebugRender(ref);
 
   return (
-    <div ref={ref} className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 sm:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
           <div className="lg:col-span-7">
@@ -85,18 +94,19 @@ export default function Complex() {
   );
 }
 
-const PostsSection = memo(() => {
+const PostsSection = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const { benchmark } = useBenchmark();
-  const addPost = useComplexStore((state) => state.addPost);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const { addPosts } = useComplexStore();
 
-  const addPosts = () => {
+  const addPostsBenchmark = () => {
     benchmark(() => {
-      addPost(structuredClone({ ...dummyContent.posts[0], id: shortId() }));
+      const newPosts = Array.from({ length: 1 }, () => ({
+        ...structuredClone(dummyContent.posts[0]),
+        id: shortId(),
+      }));
+      addPosts(newPosts);
     });
   };
 
@@ -109,7 +119,7 @@ const PostsSection = memo(() => {
         <h2 className="font-semibold text-gray-800 text-xl">Posts</h2>
         <span className="flex-1"></span>
         <button
-          onClick={addPosts}
+          onClick={addPostsBenchmark}
           className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 flex items-center justify-center gap-2">
           <BarChart2 size={16} />
           Add {BENCHMARK_SIZE.toLocaleString()} Posts
@@ -118,15 +128,13 @@ const PostsSection = memo(() => {
       <PostList />
     </div>
   );
-});
+};
 
-const PostList = memo(() => {
+const PostList = () => {
   const ref = useRef<HTMLUListElement>(null);
-  const posts = useComplexStore((state) => state.posts);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const posts = useComplexStore(selectPosts);
 
   if (!posts.length) {
     return <p className="text-gray-500 text-center py-4">No posts yet.</p>;
@@ -139,65 +147,58 @@ const PostList = memo(() => {
       ))}
     </ul>
   );
-});
+};
 
 const PostItem = memo(({ item }: { item: Post }) => {
   const ref = useRef<HTMLLIElement>(null);
-  const { toggleBenchmark } = useBenchmark();
-  const { incrementPostViews, addPostLike, addPostComment, removePost } = useComplexStore();
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const { incrementPostViews, addPostLike, addPostComment, deletePost } = useComplexStore();
 
   const incrementViews = () => {
     incrementPostViews(item.id);
   };
 
   const addLike = () => {
-    addPostLike(item.id);
+    addPostLike(item.id, shortId());
   };
 
   const addComment = () => {
-    addPostComment(item.id, {
-      ...structuredClone(dummyContent.posts[0].comments[0]),
-      id: shortId(),
-    });
+    addPostComment(item.id, { ...structuredClone(dummyContent.posts[0].comments[0]), id: shortId() });
   };
 
-  const deletePost = () => {
-    removePost(item.id);
+  const deletePostItem = () => {
+    deletePost(item.id);
   };
 
-  const PostStats = memo(() => {
+  const PostStats = () => {
     const ref = useRef<HTMLDivElement>(null);
+    useDebugRender(ref);
 
-    useEffect(() => {
-      debugRender(ref);
-    });
+    const views = useComplexStore(selectPostViews(item.id));
+    const likesCount = useComplexStore(selectPostLikesCount(item.id));
+    const commentsCount = useComplexStore(selectPostCommentsCount(item.id));
+    const status = useComplexStore(selectPostStatus(item.id));
 
     return (
       <div ref={ref} className="flex flex-wrap gap-2 mb-3">
         <span className="font-medium text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full flex items-center gap-1">
-          <Eye size={14} /> {item.views.toLocaleString()}
+          <Eye size={14} /> {views.toLocaleString()}
         </span>
         <span className="font-medium text-xs bg-red-100 text-red-800 px-3 py-1 rounded-full flex items-center gap-1">
-          <Heart size={14} /> {item.likes.length.toLocaleString()}
+          <Heart size={14} /> {likesCount.toLocaleString()}
         </span>
         <span className="font-medium text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center gap-1">
-          <MessageSquare size={14} /> {item.comments.length.toLocaleString()}
+          <MessageSquare size={14} /> {commentsCount.toLocaleString()}
         </span>
-        <span className="font-medium text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded-full">{item.status}</span>
+        <span className="font-medium text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded-full">{status}</span>
       </div>
     );
-  });
+  };
 
-  const PostInfo = memo(() => {
+  const PostInfo = () => {
     const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      debugRender(ref);
-    });
+    useDebugRender(ref);
 
     return (
       <div ref={ref} className="flex flex-col bg-gray-50 p-4 rounded-lg">
@@ -231,15 +232,14 @@ const PostItem = memo(({ item }: { item: Post }) => {
         </div>
       </div>
     );
-  });
+  };
 
-  const PostComments = memo(() => {
+  const PostComments = () => {
     const ref = useRef<HTMLDivElement>(null);
-    const displayedComments = item.comments.slice(0, 5);
+    useDebugRender(ref);
 
-    useEffect(() => {
-      debugRender(ref);
-    });
+    const comments = useComplexStore(selectPostComments(item.id));
+    const displayedComments = comments.slice(0, 5);
 
     return (
       <>
@@ -247,7 +247,7 @@ const PostItem = memo(({ item }: { item: Post }) => {
           <div ref={ref} className="mt-4 ml-2 pl-4 border-l-2 border-gray-200 flex flex-col gap-3">
             <h4 className="font-semibold text-gray-700 flex items-center gap-2">
               <MessageSquare size={16} />
-              Comments ({item.comments.length.toLocaleString()})
+              Comments ({comments.length.toLocaleString()})
             </h4>
             {displayedComments.map(
               (comment, index) => index < 5 && <CommentItem key={comment.id} comment={comment} postId={item.id} />
@@ -256,7 +256,7 @@ const PostItem = memo(({ item }: { item: Post }) => {
         )}
       </>
     );
-  });
+  };
 
   return (
     <li ref={ref} className="mb-6 last:mb-0">
@@ -281,7 +281,7 @@ const PostItem = memo(({ item }: { item: Post }) => {
           Comment ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
         </button>
         <button
-          onClick={deletePost}
+          onClick={deletePostItem}
           className="px-3 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-1">
           <Trash2 size={16} />
         </button>
@@ -293,62 +293,54 @@ const PostItem = memo(({ item }: { item: Post }) => {
 
 const CommentItem = memo(({ comment, postId }: { comment: Post['comments'][number]; postId: string }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const { toggleBenchmark } = useBenchmark();
+  useDebugRender(ref);
+
   const { addCommentLike, addCommentReply } = useComplexStore();
 
-  useEffect(() => {
-    debugRender(ref);
-  });
-
   const addLike = () => {
-    addCommentLike(postId, comment.id);
+    addCommentLike(postId, comment.id, shortId());
   };
 
   const addReply = () => {
-    addCommentReply(postId, comment.id, {
-      ...structuredClone(dummyContent.posts[0].comments[0]),
-      id: shortId(),
-    });
+    addCommentReply(postId, comment.id, { ...structuredClone(dummyContent.posts[0].comments[0]), id: shortId() });
   };
 
   const deleteComment = () => {
     console.log('Delete comment', comment.id);
   };
 
-  const CommentStats = memo(() => {
+  const CommentStats = () => {
     const ref = useRef<HTMLDivElement>(null);
+    useDebugRender(ref);
 
-    useEffect(() => {
-      debugRender(ref);
-    });
+    const likesCount = useComplexStore(selectCommentLikesCount(postId, comment.id));
+    const repliesCount = useComplexStore(selectCommentRepliesCount(postId, comment.id));
 
     return (
       <div ref={ref} className="flex gap-4 items-center">
         <button onClick={() => toggleBenchmark(addLike)} className="flex items-center gap-1 hover:text-red-500">
           <span className="flex items-center gap-1 bg-slate-200 rounded-sm px-1 py-0.5 font-medium text-xs">
             <Heart size={14} />
-            <span>{comment.likes.length.toLocaleString()}</span>
+            <span>{likesCount.toLocaleString()}</span>
           </span>
           <span className="font-medium">Like ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)</span>
         </button>
         <button onClick={() => toggleBenchmark(addReply)} className="flex items-center gap-1 hover:text-blue-500">
           <span className="flex items-center gap-1 bg-slate-200 rounded-sm px-1 py-0.5 font-medium text-xs">
             <Reply size={14} />
-            <span>{comment.replies.length.toLocaleString()}</span>
+            <span>{repliesCount.toLocaleString()}</span>
           </span>
           <span className="font-medium">Reply ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)</span>
         </button>
       </div>
     );
-  });
+  };
 
-  const CommentReplies = memo(() => {
+  const CommentReplies = () => {
     const ref = useRef<HTMLDivElement>(null);
-    const replies = comment.replies.slice(0, 3);
+    useDebugRender(ref);
 
-    useEffect(() => {
-      debugRender(ref);
-    });
+    const replies = useComplexStore(selectCommentReplies(postId, comment.id));
 
     return (
       <>
@@ -364,7 +356,7 @@ const CommentItem = memo(({ comment, postId }: { comment: Post['comments'][numbe
         )}
       </>
     );
-  });
+  };
 
   return (
     <div ref={ref} className="bg-gray-100 p-3 rounded-lg">
@@ -400,27 +392,23 @@ const ReplyItem = memo(
     commentId: string;
   }) => {
     const ref = useRef<HTMLDivElement>(null);
-    const { toggleBenchmark } = useBenchmark();
+    useDebugRender(ref);
+
     const { addReplyLike } = useComplexStore();
 
-    useEffect(() => {
-      debugRender(ref);
-    });
-
     const addLike = () => {
-      addReplyLike(postId, commentId, reply.id);
+      addReplyLike(postId, commentId, reply.id, shortId());
     };
 
     const deleteReply = () => {
       console.log('Delete reply', reply.id);
     };
 
-    const LikesCount = memo(() => {
+    const LikesCount = () => {
       const ref = useRef<HTMLButtonElement>(null);
+      useDebugRender(ref);
 
-      useEffect(() => {
-        debugRender(ref);
-      });
+      const likesCount = useComplexStore(selectReplyLikesCount(postId, commentId, reply.id));
 
       return (
         <button
@@ -428,10 +416,10 @@ const ReplyItem = memo(
           onClick={() => toggleBenchmark(addLike)}
           className="flex items-center gap-1 hover:text-red-500">
           <Heart size={12} />
-          {reply.likes.length.toLocaleString()} ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
+          {likesCount.toLocaleString()} ({BENCHMARK_TOGGLE_SIZE.toLocaleString()}x)
         </button>
       );
-    });
+    };
 
     return (
       <div ref={ref} className="bg-gray-200 p-2 rounded">
@@ -456,19 +444,13 @@ const ReplyItem = memo(
   }
 );
 
-const ComplexStats = memo(() => {
+const ComplexStats = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const posts = useComplexStore((state) => state.posts);
-  const categories = useComplexStore((state) => state.categories);
-  const tags = useComplexStore((state) => state.tags);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
-
-  const postsCount = posts.length;
-  const categoriesCount = categories.length;
-  const tagsCount = tags.length;
+  const postsCount = useComplexStore(selectPostsCount);
+  const categoriesCount = useComplexStore(selectCategoriesCount);
+  const tagsCount = useComplexStore(selectTagsCount);
 
   return (
     <div ref={ref} className="flex flex-wrap items-center justify-between">
@@ -486,26 +468,31 @@ const ComplexStats = memo(() => {
       </div>
     </div>
   );
-});
+};
 
-const CategoriesAndTagsSection = memo(() => {
+const CategoriesAndTagsSection = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const { benchmark } = useBenchmark();
-  const { addCategory, addTag } = useComplexStore();
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const { addCategories, addTags } = useComplexStore();
 
-  const addCategories = () => {
+  const addCategoriesBenchmark = () => {
     benchmark(() => {
-      addCategory(structuredClone({ ...dummyContent.categories[0], id: shortId() }));
+      const newCategories = Array.from({ length: 1 }, () => ({
+        ...structuredClone(dummyContent.categories[0]),
+        id: shortId(),
+      }));
+      addCategories(newCategories);
     });
   };
 
-  const addTags = () => {
+  const addTagsBenchmark = () => {
     benchmark(() => {
-      addTag(structuredClone({ ...dummyContent.tags[0], id: shortId() }));
+      const newTags = Array.from({ length: 1 }, () => ({
+        ...structuredClone(dummyContent.tags[0]),
+        id: shortId(),
+      }));
+      addTags(newTags);
     });
   };
 
@@ -524,7 +511,7 @@ const CategoriesAndTagsSection = memo(() => {
         </div>
         <div className="mb-4">
           <button
-            onClick={addCategories}
+            onClick={addCategoriesBenchmark}
             className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 flex items-center justify-center gap-2">
             <BarChart2 size={16} />
             Benchmark {BENCHMARK_SIZE.toLocaleString()} Categories
@@ -544,7 +531,7 @@ const CategoriesAndTagsSection = memo(() => {
         </div>
         <div className="mb-4">
           <button
-            onClick={addTags}
+            onClick={addTagsBenchmark}
             className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 flex items-center justify-center gap-2">
             <BarChart2 size={16} />
             Benchmark {BENCHMARK_SIZE.toLocaleString()} Tags
@@ -556,15 +543,13 @@ const CategoriesAndTagsSection = memo(() => {
       </div>
     </div>
   );
-});
+};
 
-const CategoryList = memo(() => {
+const CategoryList = () => {
   const ref = useRef<HTMLUListElement>(null);
-  const categories = useComplexStore((state) => state.categories);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const categories = useComplexStore(selectCategories);
 
   if (!categories.length) {
     return <p className="text-gray-500 text-center py-4">No categories yet.</p>;
@@ -577,18 +562,16 @@ const CategoryList = memo(() => {
       ))}
     </ul>
   );
-});
+};
 
 const CategoryItem = memo(({ item }: { item: Category }) => {
   const ref = useRef<HTMLLIElement>(null);
-  const { removeCategory } = useComplexStore();
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const { deleteCategory } = useComplexStore();
 
-  const deleteCategory = () => {
-    removeCategory(item.id);
+  const deleteCategoryItem = () => {
+    deleteCategory(item.id);
   };
 
   return (
@@ -608,7 +591,7 @@ const CategoryItem = memo(({ item }: { item: Category }) => {
         </div>
       </div>
       <button
-        onClick={deleteCategory}
+        onClick={deleteCategoryItem}
         className="px-3 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-1">
         <Trash2 size={16} />
       </button>
@@ -616,13 +599,11 @@ const CategoryItem = memo(({ item }: { item: Category }) => {
   );
 });
 
-const TagList = memo(() => {
+const TagList = () => {
   const ref = useRef<HTMLUListElement>(null);
-  const tags = useComplexStore((state) => state.tags);
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const tags = useComplexStore(selectTags);
 
   if (!tags.length) {
     return <p className="text-gray-500 text-center py-4">No tags yet.</p>;
@@ -635,18 +616,16 @@ const TagList = memo(() => {
       ))}
     </ul>
   );
-});
+};
 
 const TagItem = memo(({ item }: { item: TagType }) => {
   const ref = useRef<HTMLLIElement>(null);
-  const { removeTag } = useComplexStore();
+  useDebugRender(ref);
 
-  useEffect(() => {
-    debugRender(ref);
-  });
+  const { deleteTag } = useComplexStore();
 
-  const deleteTag = () => {
-    removeTag(item.id);
+  const deleteTagItem = () => {
+    deleteTag(item.id);
   };
 
   return (
@@ -660,7 +639,7 @@ const TagItem = memo(({ item }: { item: TagType }) => {
         </div>
       </div>
       <button
-        onClick={deleteTag}
+        onClick={deleteTagItem}
         className="px-3 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-1">
         <Trash2 size={16} />
       </button>

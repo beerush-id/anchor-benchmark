@@ -1,97 +1,101 @@
 import { create } from 'zustand';
-import { type Post, type Category, type Tag as TagType, type ComplexState } from '@anchor-benchmark/shared';
-import RAWJson from './dummyContent.json';
+import { type Category, type ComplexState, type Post, type Tag as TagType } from '@anchor-benchmark/shared';
+import dummyData from '@anchor-benchmark/shared/data/dummy-data.json';
 
 // Add typings to the dummy data.
-const dummyContent = RAWJson as unknown as ComplexState;
+const dummyContent = dummyData as unknown as ComplexState;
 
-// Utility function to generate short IDs (similar to Anchor's shortId)
-export const shortId = () => Math.random().toString(36).substring(2, 9);
+// Create initial state
+const initialState: ComplexState = structuredClone(dummyContent) as ComplexState;
 
-interface ComplexStoreState {
-  posts: Post[];
-  categories: Category[];
-  tags: TagType[];
-
+interface ComplexStoreState extends ComplexState {
   // Posts actions
-  addPost: (post: Post) => void;
-  removePost: (postId: string) => void;
+  addPosts: (posts: Post[]) => void;
+  deletePost: (postId: string) => void;
   incrementPostViews: (postId: string) => void;
-  addPostLike: (postId: string) => void;
+  addPostLike: (postId: string, likeId: string) => void;
   addPostComment: (postId: string, comment: Post['comments'][number]) => void;
 
-  // Comments actions
-  addCommentLike: (postId: string, commentId: string) => void;
-  addCommentReply: (postId: string, commentId: string, reply: Post['comments'][number]['replies'][number]) => void;
-
-  // Replies actions
-  addReplyLike: (postId: string, commentId: string, replyId: string) => void;
-
   // Categories actions
-  addCategory: (category: Category) => void;
-  removeCategory: (categoryId: string) => void;
+  addCategories: (categories: Category[]) => void;
+  deleteCategory: (categoryId: string) => void;
 
   // Tags actions
-  addTag: (tag: TagType) => void;
-  removeTag: (tagId: string) => void;
+  addTags: (tags: TagType[]) => void;
+  deleteTag: (tagId: string) => void;
+
+  // Comment actions
+  addCommentLike: (postId: string, commentId: string, likeId: string) => void;
+  addCommentReply: (postId: string, commentId: string, reply: Post['comments'][number]['replies'][number]) => void;
+
+  // Reply actions
+  addReplyLike: (postId: string, commentId: string, replyId: string, likeId: string) => void;
 }
 
 export const useComplexStore = create<ComplexStoreState>()((set) => ({
-  posts: structuredClone(dummyContent.posts),
-  categories: structuredClone(dummyContent.categories),
-  tags: structuredClone(dummyContent.tags),
+  ...initialState,
 
   // Posts actions
-  addPost: (post) => set((state) => ({ posts: [...state.posts, post] })),
-  removePost: (postId) =>
+  addPosts: (posts: Post[]) => {
+    set((state) => ({
+      posts: [...state.posts, ...posts],
+    }));
+  },
+
+  deletePost: (postId: string) => {
     set((state) => ({
       posts: state.posts.filter((post) => post.id !== postId),
-    })),
-  incrementPostViews: (postId) =>
+    }));
+  },
+
+  incrementPostViews: (postId: string) => {
     set((state) => ({
       posts: state.posts.map((post) => (post.id === postId ? { ...post, views: post.views + 1 } : post)),
-    })),
-  addPostLike: (postId) =>
+    }));
+  },
+
+  addPostLike: (postId: string, likeId: string) => {
     set((state) => ({
-      posts: state.posts.map((post) => (post.id === postId ? { ...post, likes: [...post.likes, shortId()] } : post)),
-    })),
-  addPostComment: (postId, comment) =>
+      posts: state.posts.map((post) => (post.id === postId ? { ...post, likes: [...post.likes, likeId] } : post)),
+    }));
+  },
+
+  addPostComment: (postId: string, comment: Post['comments'][number]) => {
     set((state) => ({
       posts: state.posts.map((post) =>
         post.id === postId ? { ...post, comments: [...post.comments, comment] } : post
       ),
-    })),
+    }));
+  },
 
-  // Comments actions
-  addCommentLike: (postId, commentId) =>
+  // Categories actions
+  addCategories: (categories: Category[]) => {
     set((state) => ({
-      posts: state.posts.map((post) => {
-        if (post.id !== postId) return post;
+      categories: [...state.categories, ...categories],
+    }));
+  },
 
-        return {
-          ...post,
-          comments: post.comments.map((comment) =>
-            comment.id === commentId ? { ...comment, likes: [...comment.likes, shortId()] } : comment
-          ),
-        };
-      }),
-    })),
-  addCommentReply: (postId, commentId, reply) =>
+  deleteCategory: (categoryId: string) => {
     set((state) => ({
-      posts: state.posts.map((post) => {
-        if (post.id !== postId) return post;
+      categories: state.categories.filter((category) => category.id !== categoryId),
+    }));
+  },
 
-        return {
-          ...post,
-          comments: post.comments.map((comment) =>
-            comment.id === commentId ? { ...comment, replies: [...comment.replies, reply] } : comment
-          ),
-        };
-      }),
-    })),
+  // Tags actions
+  addTags: (tags: TagType[]) => {
+    set((state) => ({
+      tags: [...state.tags, ...tags],
+    }));
+  },
 
-  // Replies actions
-  addReplyLike: (postId, commentId, replyId) =>
+  deleteTag: (tagId: string) => {
+    set((state) => ({
+      tags: state.tags.filter((tag) => tag.id !== tagId),
+    }));
+  },
+
+  // Comment actions
+  addCommentLike: (postId: string, commentId: string, likeId: string) => {
     set((state) => ({
       posts: state.posts.map((post) => {
         if (post.id !== postId) return post;
@@ -103,26 +107,123 @@ export const useComplexStore = create<ComplexStoreState>()((set) => ({
 
             return {
               ...comment,
-              replies: comment.replies.map((reply) =>
-                reply.id === replyId ? { ...reply, likes: [...reply.likes, shortId()] } : reply
-              ),
+              likes: [...comment.likes, likeId],
             };
           }),
         };
       }),
-    })),
+    }));
+  },
 
-  // Categories actions
-  addCategory: (category) => set((state) => ({ categories: [...state.categories, category] })),
-  removeCategory: (categoryId) =>
+  addCommentReply: (postId: string, commentId: string, reply: Post['comments'][number]['replies'][number]) => {
     set((state) => ({
-      categories: state.categories.filter((category) => category.id !== categoryId),
-    })),
+      posts: state.posts.map((post) => {
+        if (post.id !== postId) return post;
 
-  // Tags actions
-  addTag: (tag) => set((state) => ({ tags: [...state.tags, tag] })),
-  removeTag: (tagId) =>
+        return {
+          ...post,
+          comments: post.comments.map((comment) => {
+            if (comment.id !== commentId) return comment;
+
+            return {
+              ...comment,
+              replies: [...comment.replies, reply],
+            };
+          }),
+        };
+      }),
+    }));
+  },
+
+  // Reply actions
+  addReplyLike: (postId: string, commentId: string, replyId: string, likeId: string) => {
     set((state) => ({
-      tags: state.tags.filter((tag) => tag.id !== tagId),
-    })),
+      posts: state.posts.map((post) => {
+        if (post.id !== postId) return post;
+
+        return {
+          ...post,
+          comments: post.comments.map((comment) => {
+            if (comment.id !== commentId) return comment;
+
+            return {
+              ...comment,
+              replies: comment.replies.map((reply) => {
+                if (reply.id !== replyId) return reply;
+
+                return {
+                  ...reply,
+                  likes: [...reply.likes, likeId],
+                };
+              }),
+            };
+          }),
+        };
+      }),
+    }));
+  },
 }));
+
+// Selectors with proper memoization to avoid infinite loops
+export const selectPosts = (state: ComplexStoreState) => state.posts;
+export const selectCategories = (state: ComplexStoreState) => state.categories;
+export const selectTags = (state: ComplexStoreState) => state.tags;
+
+// Post selectors
+export const selectPostViews = (postId: string) => (state: ComplexStoreState) => {
+  const post = state.posts.find((post) => post.id === postId);
+  return post ? post.views : 0;
+};
+
+export const selectPostLikesCount = (postId: string) => (state: ComplexStoreState) => {
+  const post = state.posts.find((post) => post.id === postId);
+  return post ? post.likes.length : 0;
+};
+
+export const selectPostCommentsCount = (postId: string) => (state: ComplexStoreState) => {
+  const post = state.posts.find((post) => post.id === postId);
+  return post ? post.comments.length : 0;
+};
+
+export const selectPostStatus = (postId: string) => (state: ComplexStoreState) => {
+  const post = state.posts.find((post) => post.id === postId);
+  return post ? post.status : '';
+};
+
+export const selectPostComments = (postId: string) => (state: ComplexStoreState) => {
+  const post = state.posts.find((post) => post.id === postId);
+  return post ? post.comments : [];
+};
+
+// Comment selectors
+export const selectCommentLikesCount = (postId: string, commentId: string) => (state: ComplexStoreState) => {
+  const post = state.posts.find((post) => post.id === postId);
+  const comment = post?.comments.find((comment) => comment.id === commentId);
+  return comment ? comment.likes.length : 0;
+};
+
+export const selectCommentRepliesCount = (postId: string, commentId: string) => (state: ComplexStoreState) => {
+  const post = state.posts.find((post) => post.id === postId);
+  const comment = post?.comments.find((comment) => comment.id === commentId);
+  return comment ? comment.replies.length : 0;
+};
+
+export const selectCommentReplies = (postId: string, commentId: string) => (state: ComplexStoreState) => {
+  const post = state.posts.find((post) => post.id === postId);
+  const comment = post?.comments.find((comment) => comment.id === commentId);
+  return comment ? comment.replies : [];
+};
+
+// Reply selectors
+export const selectReplyLikesCount =
+  (postId: string, commentId: string, replyId: string) => (state: ComplexStoreState) => {
+    const post = state.posts.find((post) => post.id === postId);
+    const comment = post?.comments.find((comment) => comment.id === commentId);
+    const reply = comment?.replies.find((reply) => reply.id === replyId);
+    return reply ? reply.likes.length : 0;
+  };
+
+// Stats selectors
+export const selectPostsCount = (state: ComplexStoreState) => state.posts.length;
+export const selectCategoriesCount = (state: ComplexStoreState) => state.categories.length;
+export const selectTagsCount = (state: ComplexStoreState) => state.tags.length;
