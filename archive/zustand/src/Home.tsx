@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react';
 import { BENCHMARK_SIZE, BENCHMARK_TOGGLE_SIZE, evaluate, type Todo } from '@anchor-benchmark/shared';
 import { type FormEvent, memo, useEffect, useRef, useState } from 'react';
-import { useTodoStore } from './useTodoStore';
+import { useTodoStore } from './useTodoStore.js';
 
 // Debug render function to visualize re-renders
 const useDebugRender = <T extends HTMLElement>(ref: React.RefObject<T | null>) => {

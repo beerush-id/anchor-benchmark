@@ -28,7 +28,7 @@ import {
   selectTags,
   selectTagsCount,
   useComplexStore,
-} from './useComplexStore';
+} from './useComplexStore.js';
 
 // Add typings to the dummy data.
 const dummyContent = dummyData as unknown as ComplexState;

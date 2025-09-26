@@ -49,23 +49,57 @@ export const useComplexStore = create<ComplexStoreState>()((set) => ({
   },
 
   incrementPostViews: (postId: string) => {
-    set((state) => ({
-      posts: state.posts.map((post) => (post.id === postId ? { ...post, views: post.views + 1 } : post)),
-    }));
+    set((state) => {
+      const postIndex = state.posts.findIndex((post) => post.id === postId);
+      if (postIndex === -1) return state;
+
+      const updatedPosts = [...state.posts];
+      updatedPosts[postIndex] = {
+        ...updatedPosts[postIndex],
+        views: updatedPosts[postIndex].views + 1,
+      };
+
+      return {
+        ...state,
+        posts: updatedPosts,
+      };
+    });
   },
 
   addPostLike: (postId: string, likeId: string) => {
-    set((state) => ({
-      posts: state.posts.map((post) => (post.id === postId ? { ...post, likes: [...post.likes, likeId] } : post)),
-    }));
+    set((state) => {
+      const postIndex = state.posts.findIndex((post) => post.id === postId);
+      if (postIndex === -1) return state;
+
+      const updatedPosts = [...state.posts];
+      updatedPosts[postIndex] = {
+        ...updatedPosts[postIndex],
+        likes: [...updatedPosts[postIndex].likes, likeId],
+      };
+
+      return {
+        ...state,
+        posts: updatedPosts,
+      };
+    });
   },
 
   addPostComment: (postId: string, comment: Post['comments'][number]) => {
-    set((state) => ({
-      posts: state.posts.map((post) =>
-        post.id === postId ? { ...post, comments: [...post.comments, comment] } : post
-      ),
-    }));
+    set((state) => {
+      const postIndex = state.posts.findIndex((post) => post.id === postId);
+      if (postIndex === -1) return state;
+
+      const updatedPosts = [...state.posts];
+      updatedPosts[postIndex] = {
+        ...updatedPosts[postIndex],
+        comments: [...updatedPosts[postIndex].comments, comment],
+      };
+
+      return {
+        ...state,
+        posts: updatedPosts,
+      };
+    });
   },
 
   // Categories actions
@@ -96,71 +130,92 @@ export const useComplexStore = create<ComplexStoreState>()((set) => ({
 
   // Comment actions
   addCommentLike: (postId: string, commentId: string, likeId: string) => {
-    set((state) => ({
-      posts: state.posts.map((post) => {
-        if (post.id !== postId) return post;
+    set((state) => {
+      const postIndex = state.posts.findIndex((post) => post.id === postId);
+      if (postIndex === -1) return state;
 
-        return {
-          ...post,
-          comments: post.comments.map((comment) => {
-            if (comment.id !== commentId) return comment;
+      const commentIndex = state.posts[postIndex].comments.findIndex((comment) => comment.id === commentId);
+      if (commentIndex === -1) return state;
 
-            return {
-              ...comment,
-              likes: [...comment.likes, likeId],
-            };
-          }),
-        };
-      }),
-    }));
+      const updatedPosts = [...state.posts];
+      updatedPosts[postIndex] = {
+        ...updatedPosts[postIndex],
+        comments: [...updatedPosts[postIndex].comments],
+      };
+
+      updatedPosts[postIndex].comments[commentIndex] = {
+        ...updatedPosts[postIndex].comments[commentIndex],
+        likes: [...updatedPosts[postIndex].comments[commentIndex].likes, likeId],
+      };
+
+      return {
+        ...state,
+        posts: updatedPosts,
+      };
+    });
   },
 
   addCommentReply: (postId: string, commentId: string, reply: Post['comments'][number]['replies'][number]) => {
-    set((state) => ({
-      posts: state.posts.map((post) => {
-        if (post.id !== postId) return post;
+    set((state) => {
+      const postIndex = state.posts.findIndex((post) => post.id === postId);
+      if (postIndex === -1) return state;
 
-        return {
-          ...post,
-          comments: post.comments.map((comment) => {
-            if (comment.id !== commentId) return comment;
+      const commentIndex = state.posts[postIndex].comments.findIndex((comment) => comment.id === commentId);
+      if (commentIndex === -1) return state;
 
-            return {
-              ...comment,
-              replies: [...comment.replies, reply],
-            };
-          }),
-        };
-      }),
-    }));
+      const updatedPosts = [...state.posts];
+      updatedPosts[postIndex] = {
+        ...updatedPosts[postIndex],
+        comments: [...updatedPosts[postIndex].comments],
+      };
+
+      updatedPosts[postIndex].comments[commentIndex] = {
+        ...updatedPosts[postIndex].comments[commentIndex],
+        replies: [...updatedPosts[postIndex].comments[commentIndex].replies, reply],
+      };
+
+      return {
+        ...state,
+        posts: updatedPosts,
+      };
+    });
   },
 
   // Reply actions
   addReplyLike: (postId: string, commentId: string, replyId: string, likeId: string) => {
-    set((state) => ({
-      posts: state.posts.map((post) => {
-        if (post.id !== postId) return post;
+    set((state) => {
+      const postIndex = state.posts.findIndex((post) => post.id === postId);
+      if (postIndex === -1) return state;
 
-        return {
-          ...post,
-          comments: post.comments.map((comment) => {
-            if (comment.id !== commentId) return comment;
+      const commentIndex = state.posts[postIndex].comments.findIndex((comment) => comment.id === commentId);
+      if (commentIndex === -1) return state;
 
-            return {
-              ...comment,
-              replies: comment.replies.map((reply) => {
-                if (reply.id !== replyId) return reply;
+      const replyIndex = state.posts[postIndex].comments[commentIndex].replies.findIndex(
+        (reply) => reply.id === replyId
+      );
+      if (replyIndex === -1) return state;
 
-                return {
-                  ...reply,
-                  likes: [...reply.likes, likeId],
-                };
-              }),
-            };
-          }),
-        };
-      }),
-    }));
+      const updatedPosts = [...state.posts];
+      updatedPosts[postIndex] = {
+        ...updatedPosts[postIndex],
+        comments: [...updatedPosts[postIndex].comments],
+      };
+
+      updatedPosts[postIndex].comments[commentIndex] = {
+        ...updatedPosts[postIndex].comments[commentIndex],
+        replies: [...updatedPosts[postIndex].comments[commentIndex].replies],
+      };
+
+      updatedPosts[postIndex].comments[commentIndex].replies[replyIndex] = {
+        ...updatedPosts[postIndex].comments[commentIndex].replies[replyIndex],
+        likes: [...updatedPosts[postIndex].comments[commentIndex].replies[replyIndex].likes, likeId],
+      };
+
+      return {
+        ...state,
+        posts: updatedPosts,
+      };
+    });
   },
 }));
 
