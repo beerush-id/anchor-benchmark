@@ -1,10 +1,5 @@
 import { Plus } from 'lucide-react';
-import {
-  BENCHMARK_SIZE,
-  BENCHMARK_TOGGLE_SIZE,
-  evaluate,
-  type Todo,
-} from '@anchor-benchmark/shared';
+import { BENCHMARK_SIZE, BENCHMARK_TOGGLE_SIZE, evaluate, type Todo } from '@anchor-benchmark/shared';
 import { type FormEvent, memo, useEffect, useRef, useState } from 'react';
 import { useTodoStore } from './useTodoStore';
 
@@ -131,9 +126,14 @@ const TodoApp = () => {
     <div ref={ref} className="bg-slate-900 rounded-2xl shadow-xl max-w-md w-full mx-4 flex flex-col gap-4">
       <div className="px-4 mt-4">
         <h3 className="font-semibold text-slate-200 flex-1 text-xl mb-10 text-center">Zustand Todo List</h3>
-        <TodoForm newTitle={newTitle} setNewTitle={setNewTitle} addTodo={handleAddTodo} addTodoBenchmark={addTodoBenchmark} />
+        <TodoForm
+          newTitle={newTitle}
+          setNewTitle={setNewTitle}
+          addTodo={handleAddTodo}
+          addTodoBenchmark={addTodoBenchmark}
+        />
       </div>
-      <div className="px-4 max-h-[512px] overflow-y-auto">
+      <div className="px-4 max-h-[480px] overflow-y-auto">
         <TodoList
           todos={filteredTodos}
           toggleTodo={toggleTodo}

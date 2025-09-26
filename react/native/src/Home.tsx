@@ -309,7 +309,7 @@ const TodoApp = () => {
         <h3 className="font-semibold text-slate-200 flex-1 text-xl mb-10 text-center">Native Todo List</h3>
         <TodoForm newTitle={newTitle} setNewTitle={setNewTitle} addTodo={addTodo} addTodoBenchmark={addTodoBenchmark} />
       </div>
-      <div className="px-4 max-h-[512px] overflow-y-auto">
+      <div className="px-4 max-h-[480px] overflow-y-auto">
         <TodoList
           todos={filteredTodos}
           toggleTodo={toggleTodo}

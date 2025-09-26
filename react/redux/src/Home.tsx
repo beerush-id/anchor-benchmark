@@ -166,7 +166,7 @@ const TodoApp = () => {
           addTodoBenchmark={handleAddTodoBenchmark}
         />
       </div>
-      <div className="px-4 max-h-[512px] overflow-y-auto">
+      <div className="px-4 max-h-[480px] overflow-y-auto">
         <TodoList
           todos={todos}
           toggleTodo={handleToggleTodo}

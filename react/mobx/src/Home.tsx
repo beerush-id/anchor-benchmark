@@ -394,7 +394,7 @@ const TodoApp = observer(() => {
         <h3 className="font-semibold text-slate-200 flex-1 text-xl mb-10 text-center">MobX Todo List</h3>
         <TodoForm />
       </div>
-      <div className="px-4 max-h-[512px] overflow-y-auto">
+      <div className="px-4 max-h-[480px] overflow-y-auto">
         <TodoList />
       </div>
       <div className="px-4">
